@@ -1,7 +1,7 @@
 [project]
-name = "rosetta"
+name = "looking-glass"
 version = "0.1.0"
-description = "Add your description here"
+description = "OCR + translation with llms"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.120.4",
