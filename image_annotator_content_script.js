@@ -126,8 +126,8 @@
                     const ctx = canvas.getContext('2d');
 
                     // Set max dimensions (similar to backend)
-                    const maxWidth = 800;
-                    const maxHeight = 600;
+                    const maxWidth = 1000;
+                    const maxHeight = 1000;
 
                     let width = this.width;
                     let height = this.height;
@@ -155,7 +155,7 @@
                             // Use GM_xmlhttpRequest instead of fetch
                             GM_xmlhttpRequest({
                                 method: "POST",
-                                url: 'http://localhost:8000/image/annotate?translate=true&translate_language=english',
+                                url: 'http://192.168.122.1:8000/image/annotate?translate=true&translate_language=english',
                                 data: formData,
                                 onload: function(response) {
                                     const result = JSON.parse(response.responseText);
@@ -335,13 +335,22 @@ function displayLabelsOnImage(labels, imageElement) {
             labelElement.textContent = label.text;
             labelElement.title = label.text; // Tooltip for truncated text
 
+            // Add click event listener to remove labels on left click
+            labelElement.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // Remove the entire label container
+                if (labelContainer.parentNode) {
+                    labelContainer.remove();
+                }
+            });
+
             // Determine if label should be vertical based on aspect ratio
             const isVertical = labelHeight > labelWidth;
 
             let styles = `
                 position: absolute;
-                left: ${left}%;
-                top: ${top}%;
+                left: ${left + labelWidth / 2}%;
+                top: ${top + labelHeight}%;
                 width: ${labelWidth}%;
                 height: ${labelHeight}%;
                 background-color: rgba(0, 0, 0, 0.7);
@@ -351,6 +360,7 @@ function displayLabelsOnImage(labels, imageElement) {
                 font-size: 12px;
                 font-family: Arial, sans-serif;
                 pointer-events: auto;
+                cursor: pointer;  // Add pointer cursor to indicate clickable
                 display: flex;
                 align-items: center;
                 justify-content: center;

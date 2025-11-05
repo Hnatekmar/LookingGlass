@@ -12,13 +12,13 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 IMAGE_MODEL = "qwen3-8b-instruct"
-TRANSLATION_MODEL = "qwen3-30b-instruct"
+TRANSLATION_MODEL = "gpt-oss"
 LABEL_PROMPT = """
 You are a text region detection agent for machine translation workflows.
 
 **Task:** Identify and localize all text regions in the input image.
 
-**Input:** A single image containing text (e.g., speech bubbles, paragraphs, captions, signs, labels).
+**Input:** A single image containing text (e.g., speech bubbles, paragraphs, captions, signs).
 
 **Output Requirements:**
 - Return a list of bounding boxes, one for each distinct text region
@@ -39,7 +39,7 @@ You are a text region detection agent for machine translation workflows.
 - Do not overlap bounding boxes unless text regions actually overlap in the image
 """
 
-instruct_sampler = ModelSettings(
+qwen3_instruct_sampler = ModelSettings(
     temperature=0.7,
     extra_body={
         "top_p": 0.8,
@@ -50,7 +50,7 @@ instruct_sampler = ModelSettings(
     }
 )
 
-thinking_sampler = ModelSettings(
+qwen3_thinking_sampler = ModelSettings(
     temperature=0.6,
     extra_body={
         "top_p": 0.95,
@@ -60,6 +60,22 @@ thinking_sampler = ModelSettings(
         "max_tokens": 40960
     }
 )
+
+
+image_model_samplers =  qwen3_instruct_sampler
+
+translation_model_samplers = qwen3_instruct_sampler
+#     ModelSettings(
+#     # temperature=0.6,
+#     # extra_body={
+#     #     "top_p": 0.95,
+#     #     "top_k": 20,
+#     #     "presence_penalty": 0.0,
+#     #     "repetition_penalty": 1.0,
+#     #     "max_tokens": 40960
+#     # }
+# ))
+
 
 # Configure basic logging
 logging.basicConfig(
@@ -72,6 +88,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 app = FastAPI()
 
+
 class Label(BaseModel):
     x1: float
     y1: float
@@ -79,16 +96,63 @@ class Label(BaseModel):
     y2: float
     text: str
 
-
-class LabelWithoutText(BaseModel):
+class TextBoundingBox(BaseModel):
     bbox_2d: List[float]  # [x1, y1, x2, y2] format
     text: str
 
+class TextBoundingBoxContainer(BaseModel):
+    labels: List[TextBoundingBox]
+
+class CoordinateMapping(BaseModel):
+    """Contains information for transforming coordinates back to original image scale"""
+    original_width: int
+    original_height: int
+    canvas_width: int
+    canvas_height: int
+    scale_x: float
+    scale_y: float
+    offset_x: int
+    offset_y: int
+
 class AnnotationResponse(BaseModel):
     labels: List[Label]
+    coordinate_mapping: CoordinateMapping = None
 
-class AnnotateWithoutText(BaseModel):
-    labels: List[LabelWithoutText]
+def transform_coordinates_to_original(
+    bbox_2d: List[float], 
+    mapping: CoordinateMapping
+) -> List[float]:
+    """Transform coordinates from canvas back to original image scale (0-1000)"""
+    if mapping is None:
+        return bbox_2d
+    
+    # Get canvas coordinates
+    x1_canvas = bbox_2d[0]
+    y1_canvas = bbox_2d[1]
+    x2_canvas = bbox_2d[2]
+    y2_canvas = bbox_2d[3]
+    
+    # Subtract offset to get coordinates relative to the scaled image
+    x1_scaled = x1_canvas - mapping.offset_x
+    y1_scaled = y1_canvas - mapping.offset_y
+    x2_scaled = x2_canvas - mapping.offset_x
+    y2_scaled = y2_canvas - mapping.offset_y
+    
+    # Clamp to scaled image bounds
+    x1_scaled = max(0, min(x1_scaled, mapping.canvas_width))
+    y1_scaled = max(0, min(y1_scaled, mapping.canvas_height))
+    x2_scaled = max(0, min(x2_scaled, mapping.canvas_width))
+    y2_scaled = max(0, min(y2_scaled, mapping.canvas_height))
+    
+    # Transform to original coordinates
+    x1_original = max(0, min(999, (x1_scaled / mapping.scale_x) / mapping.original_width * 1000))
+    y1_original = max(0, min(999, (y1_scaled / mapping.scale_y) / mapping.original_height * 1000))
+    x2_original = max(0, min(999, (x2_scaled / mapping.scale_x) / mapping.original_width * 1000))
+    y2_original = max(0, min(999, (y2_scaled / mapping.scale_y) / mapping.original_height * 1000))
+    
+    # Ensure proper ordering
+    return [min(x1_original, x2_original), min(y1_original, y2_original), 
+            max(x1_original, x2_original), max(y1_original, y2_original)]
 
 def build_chat_agent(url: str, model: str, prompt: str, output_type=AnnotationResponse, settings=ModelSettings(
     temperature=0.6,
@@ -173,7 +237,7 @@ async def _detect_languages_from_image(binary_image: bytes) -> List[str]:
         - Languages that are available are {pytesseract.get_languages()}
         """,
         output_type=List[str],
-        settings=instruct_sampler,
+        settings=image_model_samplers,
     )
     scaled_image = await scale_image_to_size(binary_image)
     languages = await language_detector.run([
@@ -185,76 +249,68 @@ async def _detect_languages_from_image(binary_image: bytes) -> List[str]:
     logger.info(f"Detected languages: {languages.output}")
     return languages.output
 
-async def _extract_labels_with_tesseract(binary_image: bytes) -> List[LabelWithoutText]:
-    """Extract labels using Tesseract OCR with language-specific bounding boxes."""
-    try:
-        languages = await _detect_languages_from_image(binary_image)
-        # Generate language string for pytesseract
-        lang_string = '+'.join(languages)
-        
-        # Convert bytes to OpenCV image
-        image_array = np.frombuffer(binary_image, np.uint8)
-        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
-        # Apply preprocessing steps for better OCR results
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (3,3), 0)
-        thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-
-        # Convert back to PIL Image for pytesseract
-        pil_image = Image.fromarray(thresh)
-        
-        data = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT, lang=lang_string)
-        print(data)
-        print(len(data['level']))
-        labels = []
-        for i in range(len(data['level'])):
-            if data['level'][i] in [3]:  # confidence threshold
-                labels.append(LabelWithoutText(
-                    bbox_2d=[
-                        (data['left'][i] / pil_image.width) * 1000,
-                        (data['top'][i] / pil_image.height) * 1000,
-                        ((data['left'][i] + data['width'][i]) / pil_image.width) * 1000,
-                        ((data['top'][i] + data['height'][i]) / pil_image.height) * 1000
-                    ]
-                ))
-        return []
-    except Exception as e:
-        logger.error(f"Tesseract OCR failed: {e}")
-        return []
-
-async def _extract_labels_from_image(binary_image: bytes) -> AnnotateWithoutText:
+async def _extract_labels_from_image(binary_image: bytes) -> TextBoundingBoxContainer:
     """Extract text labels from an image using a labeler agent."""
     logger.info("Starting label extraction from image")
     
-    # Try using Tesseract first
-    # try:
-    #     tesseract_labels = await _extract_labels_with_tesseract(binary_image)
-    #     if tesseract_labels:
-    #         logger.info("Successfully extracted labels using Tesseract")
-    #         return AnnotateWithoutText(labels=tesseract_labels)
-    # except Exception as e:
-    #     logger.warning(f"Tesseract extraction failed, falling back to LLM: {e}")
+    # Store original dimensions for coordinate mapping
+    original_image_data = io.BytesIO(binary_image)
+    original_img = Image.open(original_image_data)
+    original_width, original_height = original_img.size
+    
+    # Calculate coordinate mapping
+    canvas_width, canvas_height = 1000, 1000
+    scale = min(canvas_width / original_width, canvas_height / original_height)
+    scaled_width = int(original_width * scale)
+    scaled_height = int(original_height * scale)
+    offset_x = (canvas_width - scaled_width) // 2
+    offset_y = (canvas_height - scaled_height) // 2
+    
+    mapping = CoordinateMapping(
+        original_width=original_width,
+        original_height=original_height,
+        canvas_width=canvas_width,
+        canvas_height=canvas_height,
+        scale_x=scale,
+        scale_y=scale,
+        offset_x=offset_x,
+        offset_y=offset_y
+    )
 
     # Fallback to LLM-based approach
     labeler = build_chat_agent(
         f"https://llm.hnatekmar.dev/{IMAGE_MODEL}/v1",
         IMAGE_MODEL,
         LABEL_PROMPT,
-        output_type=AnnotateWithoutText,
-        settings=instruct_sampler,
+        output_type=TextBoundingBoxContainer,
+        settings=image_model_samplers,
     )
+    
+    # Scale image for processing
     scaled_image = await scale_image_to_size(binary_image)
-
     logger.debug("Image scaled successfully")
+    
+    # Extract labels
     labels = await labeler.run([
         BinaryContent(
             data=scaled_image,
             media_type="image/jpeg"
         )
     ])
+    
     logger.debug(f"Labels extracted: {len(labels.output.labels)} labels found")
-    return labels.output
+    
+    # Transform coordinates to original scale
+    transformed_labels = []
+    for label in labels.output.labels:
+        original_bbox = transform_coordinates_to_original(label.bbox_2d, mapping)
+        transformed_labels.append(TextBoundingBox(
+            bbox_2d=original_bbox,
+            text=label.text
+        ))
+    
+    return TextBoundingBoxContainer(labels=transformed_labels)
+
 
 x1_i = 0
 y1_i = 1
@@ -262,56 +318,60 @@ x2_i = 2
 y2_i = 3
 
 async def _extract_text_from_labels(
-    response_labels: List[LabelWithoutText],
+    response_labels: List[TextBoundingBox],
     original_img: Image.Image,
     ocr_agent: Agent
 ) -> List[Label]:
     """Extract text from each labeled region using OCR."""
     logger.info("Starting OCR text extraction")
-    ocr_tasks = []
-    valid_labels = response_labels
-    # valid_labels = [
-    #     label for label in response_labels
-    #     if (label.bbox_2d[x2_i] - label.bbox_2d[x1_i]) > 16 and (label.bbox_2d[y2_i] - label.bbox_2d[y1_i]) > 32
-    # ]
-    # for label in valid_labels:
-    #     # Crop the region from the original image
-    #     top = max(0, int((label.bbox_2d[y1_i] / 1000.0) * original_img.height))
-    #     left = max(0, int((label.bbox_2d[x1_i] / 1000.0) * original_img.width))
-    #     right = min(original_img.width,int((label.bbox_2d[x2_i] / 1000.0) * original_img.width))
-    #     bottom = min(original_img.height,  int((label.bbox_2d[y2_i] / 1000.0) * original_img.height))
-    #     # Crop the region
-    #     cropped_img = original_img.crop((left, top, right, bottom))
-    #     # Convert cropped image to bytes
-    #     img_bytes = io.BytesIO()
-    #     cropped_img.save(img_bytes, format='JPEG', quality=90)
-    #     img_bytes.seek(0)
-    #     scaled_down_ocr_image = await scale_image_to_size(img_bytes.getvalue())
-    #     # Run OCR on the cropped region
-    #     ocr_task = ocr_agent.run([
-    #         BinaryContent(
-    #             data=scaled_down_ocr_image,
-    #             media_type="image/jpeg"
-    #         )
-    #     ])
-    #     ocr_tasks.append(ocr_task)
-    # logger.info(f"Created {len(ocr_tasks)} OCR tasks")
-    # # Execute all OCR tasks concurrently
-    # ocr_results = await asyncio.gather(*ocr_tasks)
-    # logger.debug("All OCR tasks completed")
-    # Update labels with OCR results
+
     labels = []
-    for label in valid_labels:
+    for label in response_labels:
         labels.append(
             Label(
-                text=label.text,
+                text=label.text,  # Will be filled by OCR
                 y1=label.bbox_2d[y1_i],
                 x1=label.bbox_2d[x1_i],
                 y2=label.bbox_2d[y2_i],
                 x2=label.bbox_2d[x2_i],
             )
         )
-        print(labels[-1])
+    return labels
+    # Create OCR tasks
+    ocr_tasks = []
+    for label in labels:
+        # Calculate actual pixel coordinates from normalized coordinates
+        left = max(0, int((label.x1 / 1000.0) * original_img.width))
+        top = max(0, int((label.y1 / 1000.0) * original_img.height))
+        right = min(original_img.width, int((label.x2 / 1000.0) * original_img.width))
+        bottom = min(original_img.height, int((label.y2 / 1000.0) * original_img.height))
+
+        # Crop the region from the original image
+        cropped_img = original_img.crop((left, top, right, bottom))
+
+        # Convert cropped image to bytes
+        img_bytes = io.BytesIO()
+        cropped_img.save(img_bytes, format='JPEG', quality=90)
+        img_bytes.seek(0)
+        # Run OCR on the cropped region
+        ocr_task = ocr_agent.run([
+            BinaryContent(
+                data=img_bytes.getvalue(),
+                media_type="image/jpeg"
+            )
+        ])
+        ocr_tasks.append(ocr_task)
+
+    logger.info(f"Created {len(ocr_tasks)} OCR tasks")
+
+    # Execute all OCR tasks concurrently
+    ocr_results = await asyncio.gather(*ocr_tasks)
+    logger.debug("All OCR tasks completed")
+    
+    # Update labels with OCR results
+    for label, result in zip(labels, ocr_results):
+        label.text = result.output.lstrip() if result.output else ""
+    
     logger.debug("OCR results added to labels")
     return labels
 
@@ -343,7 +403,7 @@ async def _translate_labels(
         f"https://llm.hnatekmar.dev/{TRANSLATION_MODEL}/v1",
         TRANSLATION_MODEL,
         translate_prompt,
-        settings=instruct_sampler,
+        settings=translation_model_samplers,
         output_type=str
     )
     logger.info("Translator agent built successfully")
@@ -381,9 +441,8 @@ async def annotate(data: UploadFile, translate: bool = False, translate_language
     
     # Step 1: Extract labels from the image
     binary_image = await data.read()
-    response_labels = await _extract_labels_from_image(binary_image)
     
-    # Step 2: Extract text from each label region using OCR
+    # Extract original info for coordinate mapping
     original_image_data = io.BytesIO(binary_image)
     original_img = Image.open(original_image_data)
     
@@ -398,16 +457,31 @@ async def annotate(data: UploadFile, translate: bool = False, translate_language
         IMAGE_MODEL,
         OCR_PROMPT,
         output_type=str,
-        settings=instruct_sampler
+        settings=qwen3_instruct_sampler
     )
     logger.debug("OCR agent built successfully")
     
+    response_labels = await _extract_labels_from_image(binary_image)
     labels = await _extract_text_from_labels(response_labels.labels, original_img, ocr_agent)
-    response = AnnotationResponse(
-        labels=labels
+    
+    # Create response with coordinate mapping
+    coordinate_mapping = CoordinateMapping(
+        original_width=original_img.width,
+        original_height=original_img.height,
+        canvas_width=1000,
+        canvas_height=1000,
+        scale_x=min(1000 / original_img.width, 1000 / original_img.height),
+        scale_y=min(1000 / original_img.width, 1000 / original_img.height),
+        offset_x=(1000 - int(original_img.width * min(1000 / original_img.width, 1000 / original_img.height))) // 2,
+        offset_y=(1000 - int(original_img.height * min(1000 / original_img.width, 1000 / original_img.height))) // 2
     )
     
-    # Step 3: Handle translation if requested
+    response = AnnotationResponse(
+        labels=labels,
+        coordinate_mapping=coordinate_mapping
+    )
+    
+    # Step 2: Handle translation if requested
     if translate:
         response.labels = await _translate_labels(response.labels, translate_language)
         
