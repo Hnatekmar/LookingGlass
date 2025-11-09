@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pydantic_ai import Agent, ModelSettings, BinaryContent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+import time
 
 IMAGE_MODEL = "qwen3-8b-instruct"
 TRANSLATION_MODEL = "gpt-oss"
@@ -64,7 +65,7 @@ qwen3_thinking_sampler = ModelSettings(
 
 image_model_samplers =  qwen3_instruct_sampler
 
-translation_model_samplers = qwen3_instruct_sampler
+translation_model_samplers = None # qwen3_instruct_sampler
 #     ModelSettings(
 #     # temperature=0.6,
 #     # extra_body={
@@ -177,6 +178,25 @@ def build_chat_agent(url: str, model: str, prompt: str, output_type=AnnotationRe
         output_type=output_type,
         model_settings=settings
     )
+    
+    # Wrap the agent's run method to add timing
+    original_run = agent.run
+    
+    async def timed_run(*args, **kwargs):
+        start_time = time.perf_counter()
+        try:
+            result = await original_run(*args, **kwargs)
+            end_time = time.perf_counter()
+            logger.info(f"Agent '{model}' call completed in {end_time - start_time:.3f}s")
+            return result
+        except Exception as e:
+            end_time = time.perf_counter()
+            logger.error(f"Agent '{model}' call failed after {end_time - start_time:.3f}s: {str(e)}")
+            raise
+    
+    # Replace the run method with our timed version
+    agent.run = timed_run
+    
     return agent
 
 
@@ -223,31 +243,6 @@ async def scale_image_to_size(upload_file: bytes, target_size: Tuple[int, int] =
     # Return the bytes
     return output.getvalue()
 
-async def _detect_languages_from_image(binary_image: bytes) -> List[str]:
-    """Detect languages present in an image using LLM."""
-    logger.info("Detecting languages in image")
-    language_detector = build_chat_agent(
-        f"https://llm.hnatekmar.dev/{IMAGE_MODEL}/v1",
-        IMAGE_MODEL,
-        f"""
-        You are a language detection agent.
-        - Your input is a single image
-        - Identify and return the list of languages present in the image
-        - Return only the list of language names, one per line
-        - Languages that are available are {pytesseract.get_languages()}
-        """,
-        output_type=List[str],
-        settings=image_model_samplers,
-    )
-    scaled_image = await scale_image_to_size(binary_image)
-    languages = await language_detector.run([
-        BinaryContent(
-            data=scaled_image,
-            media_type="image/jpeg"
-        )
-    ])
-    logger.info(f"Detected languages: {languages.output}")
-    return languages.output
 
 async def _extract_labels_from_image(binary_image: bytes) -> TextBoundingBoxContainer:
     """Extract text labels from an image using a labeler agent."""
@@ -256,6 +251,7 @@ async def _extract_labels_from_image(binary_image: bytes) -> TextBoundingBoxCont
     # Store original dimensions for coordinate mapping
     original_image_data = io.BytesIO(binary_image)
     original_img = Image.open(original_image_data)
+    logger.info("Image opened")
     original_width, original_height = original_img.size
     
     # Calculate coordinate mapping
@@ -277,6 +273,12 @@ async def _extract_labels_from_image(binary_image: bytes) -> TextBoundingBoxCont
         offset_y=offset_y
     )
 
+
+    # Scale image for processing
+    logger.info("Scaling image")
+    scaled_image = await scale_image_to_size(binary_image)
+    logger.info("Image scaled successfully")
+
     # Fallback to LLM-based approach
     labeler = build_chat_agent(
         f"https://llm.hnatekmar.dev/{IMAGE_MODEL}/v1",
@@ -285,11 +287,6 @@ async def _extract_labels_from_image(binary_image: bytes) -> TextBoundingBoxCont
         output_type=TextBoundingBoxContainer,
         settings=image_model_samplers,
     )
-    
-    # Scale image for processing
-    scaled_image = await scale_image_to_size(binary_image)
-    logger.debug("Image scaled successfully")
-    
     # Extract labels
     labels = await labeler.run([
         BinaryContent(
@@ -298,7 +295,7 @@ async def _extract_labels_from_image(binary_image: bytes) -> TextBoundingBoxCont
         )
     ])
     
-    logger.debug(f"Labels extracted: {len(labels.output.labels)} labels found")
+    logger.info(f"Labels extracted: {len(labels.output.labels)} labels found")
     
     # Transform coordinates to original scale
     transformed_labels = []
@@ -319,8 +316,6 @@ y2_i = 3
 
 async def _extract_text_from_labels(
     response_labels: List[TextBoundingBox],
-    original_img: Image.Image,
-    ocr_agent: Agent
 ) -> List[Label]:
     """Extract text from each labeled region using OCR."""
     logger.info("Starting OCR text extraction")
@@ -337,44 +332,6 @@ async def _extract_text_from_labels(
             )
         )
     return labels
-    # Create OCR tasks
-    ocr_tasks = []
-    for label in labels:
-        # Calculate actual pixel coordinates from normalized coordinates
-        left = max(0, int((label.x1 / 1000.0) * original_img.width))
-        top = max(0, int((label.y1 / 1000.0) * original_img.height))
-        right = min(original_img.width, int((label.x2 / 1000.0) * original_img.width))
-        bottom = min(original_img.height, int((label.y2 / 1000.0) * original_img.height))
-
-        # Crop the region from the original image
-        cropped_img = original_img.crop((left, top, right, bottom))
-
-        # Convert cropped image to bytes
-        img_bytes = io.BytesIO()
-        cropped_img.save(img_bytes, format='JPEG', quality=90)
-        img_bytes.seek(0)
-        # Run OCR on the cropped region
-        ocr_task = ocr_agent.run([
-            BinaryContent(
-                data=img_bytes.getvalue(),
-                media_type="image/jpeg"
-            )
-        ])
-        ocr_tasks.append(ocr_task)
-
-    logger.info(f"Created {len(ocr_tasks)} OCR tasks")
-
-    # Execute all OCR tasks concurrently
-    ocr_results = await asyncio.gather(*ocr_tasks)
-    logger.debug("All OCR tasks completed")
-    
-    # Update labels with OCR results
-    for label, result in zip(labels, ocr_results):
-        label.text = result.output.lstrip() if result.output else ""
-    
-    logger.debug("OCR results added to labels")
-    return labels
-
 
 async def _translate_labels(
     labels: List[Label],
@@ -438,31 +395,18 @@ async def annotate(data: UploadFile, translate: bool = False, translate_language
     :return: Processed image annotation response
     """
     logger.info("Starting image annotation process")
-    
+    start_time = time.perf_counter()  # total processing start
+
     # Step 1: Extract labels from the image
+    step1_start = time.perf_counter()
     binary_image = await data.read()
     
     # Extract original info for coordinate mapping
     original_image_data = io.BytesIO(binary_image)
     original_img = Image.open(original_image_data)
     
-    # Create OCR agent for text extraction
-    OCR_PROMPT = """
-    You are an OCR agent that extracts text from a specific region of an image.
-    - You are given cropped image 
-    - Return only the text that you can see
-    """
-    ocr_agent = build_chat_agent(
-        f"https://llm.hnatekmar.dev/{IMAGE_MODEL}/v1",
-        IMAGE_MODEL,
-        OCR_PROMPT,
-        output_type=str,
-        settings=qwen3_instruct_sampler
-    )
-    logger.debug("OCR agent built successfully")
-    
     response_labels = await _extract_labels_from_image(binary_image)
-    labels = await _extract_text_from_labels(response_labels.labels, original_img, ocr_agent)
+    labels = await _extract_text_from_labels(response_labels.labels)
     
     # Create response with coordinate mapping
     coordinate_mapping = CoordinateMapping(
@@ -483,7 +427,11 @@ async def annotate(data: UploadFile, translate: bool = False, translate_language
     
     # Step 2: Handle translation if requested
     if translate:
+        translate_start = time.perf_counter()
         response.labels = await _translate_labels(response.labels, translate_language)
-        
-    logger.info("Image annotation process completed successfully")
+        translate_end = time.perf_counter()
+        logger.info(f"Step 2 (translation) took {translate_end - translate_start:.3f}s")
+    
+    total_duration = time.perf_counter() - start_time
+    logger.info(f"Image annotation process completed in {total_duration:.3f}s")
     return response
