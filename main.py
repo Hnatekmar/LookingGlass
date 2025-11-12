@@ -8,12 +8,12 @@ from PIL import Image, ImageOps
 from fastapi import FastAPI, UploadFile
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelSettings, BinaryContent
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 import time
 
 IMAGE_MODEL = "qwen3-8b-instruct"
-TRANSLATION_MODEL = "gpt-oss"
+TRANSLATION_MODEL = "qwen-next-instruct"
 LABEL_PROMPT = """
 You are a text region detection agent for machine translation workflows.
 
@@ -45,14 +45,14 @@ qwen3_instruct_sampler = ModelSettings(
     extra_body={
         "top_p": 0.8,
         "top_k": 20,
-        "presence_penalty": 1.5,
         "repetition_penalty": 1.0,
-        "max_tokens": 32768
+        "presence_penalty": 1.5,
+        "max_tokens": 16384
     }
 )
 
 qwen3_thinking_sampler = ModelSettings(
-    temperature=0.6,
+    temperature=1.0,
     extra_body={
         "top_p": 0.95,
         "top_k": 20,
@@ -66,16 +66,21 @@ qwen3_thinking_sampler = ModelSettings(
 image_model_samplers =  qwen3_instruct_sampler
 
 translation_model_samplers = None # qwen3_instruct_sampler
-#     ModelSettings(
-#     # temperature=0.6,
-#     # extra_body={
-#     #     "top_p": 0.95,
-#     #     "top_k": 20,
-#     #     "presence_penalty": 0.0,
-#     #     "repetition_penalty": 1.0,
-#     #     "max_tokens": 40960
-#     # }
-# ))
+# = OpenAIChatModelSettings(
+#     temperature=0.0,
+#     openai_reasoning_effort='low'
+# )
+# ModelSettings(
+#
+#     temperature=0.6,
+#     extra_body={
+#         "top_p": 0.95,
+#         "top_k": 20,
+#         "presence_penalty": 1.5,
+#         "repetition_penalty": 1.0,
+#         "max_tokens": 32768
+#     }
+# )
 
 
 # Configure basic logging
