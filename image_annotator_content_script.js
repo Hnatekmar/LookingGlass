@@ -314,22 +314,27 @@ function displayLabelsOnImage(labels, imageElement) {
                 !label.text) {
                 return;
             }
-
-            // Validate coordinate bounds
-            if (label.x1 < 0 || label.x1 > LABEL_COORDINATE_MAX ||
-                label.x2 < 0 || label.x2 > LABEL_COORDINATE_MAX ||
-                label.y1 < 0 || label.y1 > LABEL_COORDINATE_MAX ||
-                label.y2 < 0 || label.y2 > LABEL_COORDINATE_MAX) {
-                console.warn("Label coordinates out of bounds:", label);
+            // Validate coordinate bounds (normalized 0-1)
+            if (label.x1 < 0 || label.x1 > 1 ||
+                label.x2 < 0 || label.x2 > 1 ||
+                label.y1 < 0 || label.y1 > 1 ||
+                label.y2 < 0 || label.y2 > 1) {
+                console.warn("Label coordinates out of bounds (normalized):", label);
                 return;
             }
-            const labelWidth = ((label.x2 - label.x1) / LABEL_COORDINATE_MAX) * 100;
-            const labelHeight = ((label.y2 - label.y1) / LABEL_COORDINATE_MAX) * 100;
+
+            // Rescale normalized coordinates to pixel values
+            const x1 = label.x1;
+            const y1 = label.y1;
+            const x2 = label.x2;
+            const y2 = label.y2;
+
+            const labelWidth = x2 - x1;
+            const labelHeight = y2 - y1;
 
             // Calculate position and dimensions using normalized coordinates
-            const left = (label.x1 / LABEL_COORDINATE_MAX) * 100;
-            const top = (label.y1 / LABEL_COORDINATE_MAX) * 100;
-
+            const left = x1;
+            const top = y1;
             const labelElement = document.createElement('div');
             labelElement.className = 'image-label';
             labelElement.textContent = label.text;
@@ -349,8 +354,8 @@ function displayLabelsOnImage(labels, imageElement) {
 
             let styles = `
                 position: absolute;
-                left: ${left + labelWidth / 2}%;
-                top: ${top + labelHeight}%;
+                left: ${left}%;
+                top: ${top}%;
                 width: ${labelWidth}%;
                 height: ${labelHeight}%;
                 background-color: rgba(0, 0, 0, 0.7);
