@@ -6,7 +6,7 @@ from typing import List, Tuple
 from PIL import Image
 from pydantic_ai import BinaryContent
 
-from app.common import logger, IMAGE_MODEL, LABEL_PROMPT
+from app.common import logger, IMAGE_MODEL, LABEL_PROMPT, LLM_BASE_URL
 from app.dependencies import build_chat_agent
 from app.schema import TextBoundingBox, Label, AnnotationResponse
 
@@ -116,7 +116,7 @@ async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
     scaled_image = await prepare_image_for_deepseek_ocr(binary_image)
     # Fallback to LLM-based approach
     labeler = build_chat_agent(
-        f"https://llm.hnatekmar.dev/{IMAGE_MODEL}/v1",
+        f"{LLM_BASE_URL}/{IMAGE_MODEL}/v1",
         IMAGE_MODEL,
         # "<image>\n<|grounding|>Locate <|ref|>text </|ref|>.",
         LABEL_PROMPT,

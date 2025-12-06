@@ -155,7 +155,7 @@
                             // Use GM_xmlhttpRequest instead of fetch
                             GM_xmlhttpRequest({
                                 method: "POST",
-                                url: 'http://192.168.122.1:8000/image/annotate?translate=true&translate_language=english',
+                                url: 'http://localhost:8000/image/annotate?translate=true&translate_language=english',
                                 data: formData,
                                 onload: function(response) {
                                     const result = JSON.parse(response.responseText);

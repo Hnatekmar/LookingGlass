@@ -1,41 +1,19 @@
-# Looking Glass - Image Annotation Service
+# Looking Glass
 
-This service provides image annotation capabilities with optional text translation.
+An intelligent image annotation service that performs OCR (Optical Character Recognition) and optional translation using Large Language Models (LLMs). Perfect for extracting text from images, manga/comic translation workflows, and automated document processing.
 
-## Architecture
+## 🚀 Quick Start
 
-The application is organized into logical sections within a single main.py file:
+### Prerequisites
 
-### 1. Configuration and Imports
-- Constants and model settings
-- Logging configuration
-- FastAPI app initialization
+- Python 3.12 or higher
+- [uv](https://github.com/astral-sh/uv) package manager (recommended) or pip
 
-### 2. Data Models
-- Label: Represents a text region with coordinates and text
-- LabelWithoutText: Represents a text region with coordinates (no text)
-- AnnotationResponse: Response format for annotations
-- AnnotateWithoutText: Request/response format for label extraction
+### Installation
 
-### 3. Agent Management
-- build_chat_agent: Factory function for creating AI agents
-
-### 4. Image Processing
-- scale_image_to_size: Resizes images to target dimensions
-- Language detection and label extraction functions
-
-### 5. OCR and Translation
-- Text extraction from labeled regions
-- Translation functionality
-
-### 6. API Endpoint
-- /image/annotate/: Main endpoint for image annotation with optional translation
-
-## Usage
-
-The service provides a POST endpoint at `/image/annotate/` that accepts:
-- An image file upload
-- Optional `translate` parameter (boolean)
-- Optional `translate_language` parameter (defaults to "english")
-
-The endpoint returns annotated text regions with extracted text and optional translation.
+1. Clone the repository:
+2. uv sync
+3. uv run fastapi run main.py
+4. Change translation model [common.py](app/common.py) you will also want to 
+5. Copy ./image_annotator_content_scrip.js to https://violentmonkey.github.io/ (if server is running in another machine change the url in the script)
+5. Right click on any image and script should label it and translate it to english.

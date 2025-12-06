@@ -1,7 +1,7 @@
 import asyncio
 from typing import List
 
-from app.common import logger, TRANSLATION_MODEL, translation_model_samplers
+from app.common import logger, TRANSLATION_MODEL, translation_model_samplers, LLM_BASE_URL
 from app.dependencies import build_chat_agent
 from app.schema import Label
 
@@ -30,7 +30,7 @@ async def _translate_labels(
     """
     translate_prompt = TRANSLATE_PROMPT_TEMPLATE.format(language=translate_language)
     translator = build_chat_agent(
-        f"https://llm.hnatekmar.dev/{TRANSLATION_MODEL}/v1",
+        f"{LLM_BASE_URL}/{TRANSLATION_MODEL}/v1",
         TRANSLATION_MODEL,
         translate_prompt,
         settings=translation_model_samplers,

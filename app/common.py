@@ -3,6 +3,8 @@ import random
 
 from pydantic_ai import ModelSettings
 
+LLM_BASE_URL = "https://llm.hnatekmar.dev"
+
 IMAGE_MODEL = "qwen3-8b-instruct"
 TRANSLATION_MODEL = "qwen3-30b-instruct"
 LABEL_PROMPT = """
