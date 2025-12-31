@@ -38,7 +38,7 @@ async def prepare_image_for_deepseek_ocr(upload_file: bytes) -> Image.Image:
             img = img.convert('RGB')
 
     # Resize image to maximum 1024x1024 while preserving aspect ratio
-    max_size = 512
+    max_size = 1024
     img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
     # Convert to grayscale
@@ -95,10 +95,10 @@ def parse_text_with_boxes(text: str) -> List[Label]:
 
             # Create label
             label = Label(
-                x1=x1 / 999,
-                y1=y1 / 999,
-                x2=x2 / 999,
-                y2=y2 / 999,
+                x1=x1 / 1000,
+                y1=y1 / 1000,
+                x2=x2 / 1000,
+                y2=y2 / 1000,
                 text=text
             )
             labels.append(label)

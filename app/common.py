@@ -1,12 +1,11 @@
 import logging
-import random
 
 from pydantic_ai import ModelSettings
 
 LLM_BASE_URL = "https://llm.hnatekmar.dev"
 
 IMAGE_MODEL = "qwen3-8b-instruct"
-TRANSLATION_MODEL = "qwen3-30b-instruct"
+TRANSLATION_MODEL = "hy-mt"
 LABEL_PROMPT = """
 You are a text region detection agent for machine translation workflows.
 
@@ -34,13 +33,13 @@ You are a text region detection agent for machine translation workflows.
 """
 
 qwen3_instruct_sampler = ModelSettings(
-    temperature=0.7,
+    temperature=0.2,
     extra_body={
         "top_p": 0.8,
         "top_k": 20,
-        "repetition_penalty": 1.0,
+        "frequency_penalty": 1.5,
         "presence_penalty": 1.5,
-        "max_tokens": 16384
+        "max_completion_tokens": 16384
     }
 )
 
@@ -72,7 +71,24 @@ deepseek_ocr_sampler = ModelSettings(
 
 image_model_samplers =  qwen3_instruct_sampler
 
-translation_model_samplers = None # qwen3_instruct_sampler
+translation_model_samplers = ModelSettings(
+    temperature=0.7,
+    extra_body={
+        "top_p": 0.6,
+        "top_k": 20,
+        "frequency_penalty": 1.05,
+        "max_completion_tokens": 8096
+    }
+
+)
+# ModelSettings(
+#     temperature=1,
+#     extra_body={
+#         "top_p": 1,
+#         "chat_template_kwargs": {"enable_thinking": True},
+#         "max_completion_tokens": 1024
+#     }
+# ) # qwen3_instruct_sampler
 
 # Configure basic logging
 logging.basicConfig(

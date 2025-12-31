@@ -1,16 +1,42 @@
-import io
 import time
 
-from PIL import Image
 from fastapi import UploadFile, FastAPI
-from app.image_processing import _extract_labels_from_image, _extract_labels_from_bounding_boxes
-from app.schema import AnnotationResponse
-from app.translation import _translate_labels
+from pydantic import BaseModel
+
 from app.common import logger
+from app.image_processing import _extract_labels_from_image
+from app.translation import _translate_labels, _translate_text
+
 app = FastAPI()
 
+
+class TranslateRequest(BaseModel):
+    text: str
+
+
+@app.post("/translate/")
+async def translate(request: TranslateRequest, target_language: str = "english"):
+    """
+    Post endpoint for text translation.
+    This endpoint accepts a text string and translates it to the specified language.
+    :param request: Request body containing the text to translate
+    :param target_language: Target language for translation, defaults to 'english'
+    :return: Translated text response
+    """
+    logger.info(f"Starting translation to {target_language}")
+    start_time = time.perf_counter()
+
+    translated_text = await _translate_text(request.text, target_language)
+
+    total_duration = time.perf_counter() - start_time
+    logger.info(f"Translation completed in {total_duration:.3f}s")
+    return {"translated_text": translated_text}
+
+
 @app.post("/image/annotate/")
-async def annotate(data: UploadFile, translate: bool = False, translate_language: str = "english"):
+async def annotate(
+    data: UploadFile, translate: bool = False, translate_language: str = "english"
+):
     """
     Post endpoint for image annotation processing.
     This endpoint accepts an image file upload and optional translation parameters

@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Model names
     image_model: str = "qwen3-8b-instruct"
-    translation_model: str = "qwen3-30b-instruct"
+    translation_model: str = "nemotron-3-nano"
 
     # Prompts
     label_prompt: str = """

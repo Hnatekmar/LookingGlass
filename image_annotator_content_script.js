@@ -48,10 +48,16 @@
 
     // Add context menu item for each image
     document.addEventListener('contextmenu', function(e) {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
         if (e.target.tagName === 'IMG') {
             e.preventDefault();
             const imageUrl = e.target.src;
-            annotateImage(imageUrl, e.target); // Pass the actual image element
+            annotateImage(imageUrl, e.target);
+        } else if (selectedText.length > 0) {
+            e.preventDefault();
+            translateText(selectedText, selection);
         }
     });
 
@@ -217,6 +223,66 @@
                     loadingIndicator.parentNode.removeChild(loadingIndicator);
                 }
                 document.oncontextmenu = originalContextMenuHandler;
+            }
+        });
+    }
+
+    // Function to translate selected text
+    function translateText(text, selection) {
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.textContent = 'Translating...';
+        loadingIndicator.style.position = 'fixed';
+        loadingIndicator.style.top = '10px';
+        loadingIndicator.style.right = '10px';
+        loadingIndicator.style.background = 'black';
+        loadingIndicator.style.border = '1px solid #ccc';
+        loadingIndicator.style.padding = '15px';
+        loadingIndicator.style.borderRadius = '5px';
+        loadingIndicator.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2);'
+        loadingIndicator.style.zIndex = '10001';
+        loadingIndicator.style.fontFamily = 'Arial, sans-serif';
+        loadingIndicator.style.display = 'flex';
+        loadingIndicator.style.alignItems = 'center';
+        loadingIndicator.style.gap = '8px';
+        document.body.appendChild(loadingIndicator);
+
+        const spinner = document.createElement('div');
+        spinner.style.border = '2px solid #f3f3f3';
+        spinner.style.borderTop = '2px solid #3498db';
+        spinner.style.borderRadius = '50%';
+        spinner.style.width = '16px';
+        spinner.style.height = '16px';
+        spinner.style.animation = 'spin 1s linear infinite';
+        loadingIndicator.appendChild(spinner);
+
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: 'http://localhost:8000/translate?target_language=english',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            data: JSON.stringify({ text: text }),
+            onload: function(response) {
+                const result = JSON.parse(response.responseText);
+                console.log('Translation result:', result);
+
+                if (result.translated_text) {
+                    const range = selection.getRangeAt(0);
+                    const span = document.createElement('span');
+                    span.textContent = result.translated_text;
+                    range.deleteContents();
+                    range.insertNode(span);
+                }
+
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
+            },
+            onerror: function(error) {
+                console.error('Error translating text:', error);
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
             }
         });
     }
