@@ -41,12 +41,6 @@
             if (originalPosition === 'static') {
                 parent.style.position = 'relative';
             }
-            
-            // Also ensure the image itself doesn't interfere with stacking
-            const imageZIndex = computedStyle.zIndex;
-            if (imageZIndex === 'auto' || parseInt(imageZIndex) < 10000) {
-                // Image is fine, labels will be on top
-            }
 
             // Get actual rendered dimensions
             const width = imageElement.offsetWidth;
@@ -57,17 +51,20 @@
                 return;
             }
 
+            // Get the image's position relative to its parent
+            const topOffset = imageElement.offsetTop;
+            const leftOffset = imageElement.offsetLeft;
+
             // Create container positioned to overlay the image
             const labelContainer = document.createElement('div');
             labelContainer.className = 'image-label-container';
             labelContainer.dataset.imageId = getImageId(imageElement);
             
             // Position the container to exactly overlay the image
-            // We use the image's offset position relative to its offsetParent
             labelContainer.style.cssText = `
                 position: absolute;
-                top: ${imageElement.offsetTop}px;
-                left: ${imageElement.offsetLeft}px;
+                top: ${topOffset}px;
+                left: ${leftOffset}px;
                 width: ${width}px;
                 height: ${height}px;
                 pointer-events: none;
@@ -456,7 +453,6 @@
         }
         .image-label {
             position: absolute;
-            transform: translate(-50%, -100%);
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 4px 8px;

@@ -158,8 +158,27 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     )
 
     # Optional sampler overrides (can be supplied via env vars as JSON strings)
-    image_model_samplers: ModelSettings | None = None
-    translation_model_samplers: ModelSettings | None = None
+    image_model_samplers: ModelSettings | None = ModelSettings(
+        temperature=0.7,
+        max_tokens=32768,
+        top_p=0.8,
+        presence_penalty=1.5,
+        extra_body={
+            "top_k": 20,
+            "chat_template_kwargs": {"enable_thinking": False},
+        },
+    )
+
+    translation_model_samplers: ModelSettings | None = ModelSettings(
+        temperature=0.7,
+        max_tokens=32768,
+        top_p=0.8,
+        presence_penalty=1.5,
+        extra_body={
+            "top_k": 20,
+            "chat_template_kwargs": {"enable_thinking": False},
+        },
+    )
 
     # Optional generic LLM base URL (fallback for models not explicitly configured)
     llm_base_url: str | None = (
