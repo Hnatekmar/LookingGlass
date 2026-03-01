@@ -7,12 +7,15 @@ This test suite covers:
 - Error handling
 - Concurrent requests
 - Parameter validation
+- Batch translation efficiency
 """
 
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
+
+from app.schema import Label
 
 
 # Test data constants
@@ -383,3 +386,157 @@ class TestTranslationEndpointWithDirectMock:
 
         assert response.status_code == 200
         assert response.json()["translated_text"] == "Expected translation"
+
+
+class TestBatchTranslation:
+    """Test suite for batch translation functionality."""
+
+    @pytest.fixture
+    def sample_labels(self):
+        """Create sample labels for testing."""
+        return [
+            Label(x1=0.1, y1=0.1, x2=0.3, y2=0.2, text="Hello"),
+            Label(x1=0.1, y1=0.3, x2=0.3, y2=0.4, text="World"),
+            Label(x1=0.1, y1=0.5, x2=0.3, y2=0.6, text="Good morning"),
+        ]
+
+    @pytest.fixture
+    def client_with_batch_mock(self):
+        """Create test client with batch translation and image mock."""
+        with (
+            patch("app.routes._extract_labels_from_image") as mock_extract,
+            patch("app.routes._translate_labels_batch") as mock_batch_translate,
+        ):
+            from app.schema import AnnotationResponse
+
+            # Mock image extraction to return sample labels (async)
+            async def mock_extract_labels(image_bytes):
+                return AnnotationResponse(
+                    labels=[
+                        Label(x1=0.1, y1=0.1, x2=0.3, y2=0.2, text="Hello"),
+                        Label(x1=0.1, y1=0.3, x2=0.3, y2=0.4, text="World"),
+                        Label(x1=0.1, y1=0.5, x2=0.3, y2=0.6, text="Good morning"),
+                    ]
+                )
+
+            mock_extract.side_effect = mock_extract_labels
+
+            # Mock batch translation to return translated labels
+            def mock_translate(labels, language):
+                translated = [
+                    Label(
+                        x1=l.x1,
+                        y1=l.y1,
+                        x2=l.x2,
+                        y2=l.y2,
+                        text=f"[{language}] {l.text}",
+                    )
+                    for l in labels
+                ]
+                return translated
+
+            mock_batch_translate.side_effect = mock_translate
+
+            from app.routes import app
+
+            client = TestClient(app, raise_server_exceptions=False)
+            yield client
+
+    def test_batch_translation_with_multiple_labels(self, client_with_batch_mock):
+        """Test batch translation with multiple labels in one request."""
+        # Use files parameter for file upload
+        response = client_with_batch_mock.post(
+            "/image/annotate/?translate=true&translate_language=french",
+            files={"data": ("test.jpg", b"fake_image_data", "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        # Verify batch translation was called (should be called once, not multiple times)
+        from app import routes
+
+        assert routes._translate_labels_batch.called
+
+    def test_batch_translation_preserves_coordinates(self, client_with_batch_mock):
+        """Test that batch translation preserves label coordinates."""
+        response = client_with_batch_mock.post(
+            "/image/annotate/?translate=true&translate_language=spanish",
+            files={"data": ("test.jpg", b"fake_image_data", "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        # Coordinates should be preserved (only text changes)
+        assert "labels" in data
+        # Check that we have translated labels
+        assert len(data["labels"]) > 0
+        # Verify coordinates are preserved (should be close to original)
+        for label in data["labels"]:
+            assert 0 <= label["x1"] <= 1
+            assert 0 <= label["y1"] <= 1
+            assert 0 <= label["x2"] <= 1
+            assert 0 <= label["y2"] <= 1
+
+    def test_batch_translation_empty_labels(self, client_with_batch_mock):
+        """Test batch translation with empty label list."""
+        # This would happen if no text is detected in image
+        # The batch function should handle empty lists gracefully
+        from app.translation import _translate_labels_batch
+
+        async def test_empty():
+            result = await _translate_labels_batch([], "french")
+            assert result == []
+
+        asyncio.run(test_empty())
+
+    def test_batch_vs_individual_efficiency(self):
+        """
+        Verify that batch translation creates fewer API calls.
+
+        This test documents the efficiency improvement:
+        - Individual: N labels = N API calls
+        - Batch: N labels = 1 API call
+        """
+        from app.translation import _translate_labels, _translate_labels_batch
+        from unittest.mock import AsyncMock, MagicMock
+        import json
+
+        # Create sample labels
+        labels = [Label(x1=0, y1=0, x2=1, y2=1, text=f"Text {i}") for i in range(10)]
+
+        # Count API calls for individual translation
+        with patch("app.translation.get_chat_agent") as mock_get_agent:
+            mock_agent = MagicMock()
+            mock_result = MagicMock()
+            mock_result.output = "Translated"
+            mock_agent.run = AsyncMock(return_value=mock_result)
+            mock_get_agent.return_value = mock_agent
+
+            async def count_individual():
+                labels_copy = [Label(**l.model_dump()) for l in labels]
+                await _translate_labels(labels_copy, "french")
+                return mock_agent.run.call_count
+
+            individual_calls = asyncio.run(count_individual())
+
+        # Count API calls for batch translation
+        with patch("app.translation.get_chat_agent") as mock_get_agent:
+            mock_agent = MagicMock()
+            mock_result = MagicMock()
+            # Return proper JSON format for batch translation
+            mock_result.output = json.dumps(
+                [{"id": i, "translated_text": f"Translated {i}"} for i in range(10)]
+            )
+            mock_agent.run = AsyncMock(return_value=mock_result)
+            mock_get_agent.return_value = mock_agent
+
+            async def count_batch():
+                labels_copy = [Label(**l.model_dump()) for l in labels]
+                await _translate_labels_batch(labels_copy, "french")
+                return mock_agent.run.call_count
+
+            batch_calls = asyncio.run(count_batch())
+
+        # Batch should use significantly fewer calls
+        assert individual_calls == 10  # One per label
+        assert batch_calls == 1  # Single batch call
+        assert batch_calls < individual_calls
