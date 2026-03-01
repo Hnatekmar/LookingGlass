@@ -1,2 +1,14 @@
+# Python artefacts
 __pycache__/
-.idea/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# uv lock (optional)
+*.lock
+
+# VSCode
+.vscode/

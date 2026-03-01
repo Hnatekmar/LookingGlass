@@ -19,5 +19,10 @@ class TextBoundingBox(BaseModel):
 class TextBoundingBoxContainer(BaseModel):
     labels: List[TextBoundingBox]
 
+
 class AnnotationResponse(BaseModel):
     labels: List[Label]
+
+
+class TranslationResponse(BaseModel):
+    translated_text: str

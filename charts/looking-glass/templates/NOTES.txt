@@ -1,0 +1,39 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+## Next Steps:
+
+1. **Configure your secrets**: The chart was installed with placeholder secrets. Update them with real values:
+
+   ```bash
+   # Option 1: Use helm upgrade with values
+   helm upgrade {{ .Release.Name }} ./charts/looking-glass \
+     --set secrets.imageModel="your-image-model" \
+     --set secrets.translationModel="your-translation-model" \
+     --set secrets.imageModelUrl="https://your-image-model-url" \
+     --set secrets.translationModelUrl="https://your-translation-model-url"
+
+   # Option 2: Use a custom values file
+   helm upgrade {{ .Release.Name }} ./charts/looking-glass -f your-values.yaml
+   ```
+
+2. **Access the API**:
+   - If using ClusterIP (default): Port-forward to access locally
+     ```bash
+     kubectl port-forward svc/{{ include "looking-glass.fullname" . }} 8000:8000 -n {{ include "looking-glass.namespace" . }}
+     ```
+   - If using Ingress: Access via the configured host
+
+3. **Check the API documentation**: Once running, visit `/docs` for the Swagger UI
+
+4. **Monitor the deployment**:
+   ```bash
+   kubectl get pods -n {{ include "looking-glass.namespace" . }} -l app.kubernetes.io/name={{ include "looking-glass.name" . }}
+   kubectl logs -f deployment/{{ include "looking-glass.fullname" . }} -n {{ include "looking-glass.namespace" . }}
+   ```

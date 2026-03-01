@@ -1091,6 +1091,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pytesseract" },
     { name = "pytest" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -1103,6 +1104,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "pytesseract", specifier = ">=0.3.13" },
     { name = "pytest", specifier = ">=8.4.2" },
+    { name = "uvicorn", specifier = ">=0.30.0" },
 ]
 
 [[package]]

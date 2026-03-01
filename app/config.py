@@ -1,0 +1,157 @@
+# app/config.py
+"""
+Central configuration entry point.
+
+- Loads all settings from environment variables (via pydantic‑settings).
+- Exposes a frozen, immutable Settings instance.
+- Provides a `get_settings()` accessor for dependency‑injection.
+"""
+
+import os
+from pathlib import Path
+
+from pydantic import (
+    Field,
+    ConfigDict,
+)  # Import Pydantic base classes for settings management
+from pydantic_settings import (
+    BaseSettings,
+    SettingsConfigDict,
+)  # Import BaseSettings from pydantic-settings package
+from pydantic_ai import ModelSettings  # Import ModelSettings for AI model configuration
+
+# Determine the project root directory (parent of app/)
+PROJECT_ROOT = Path(__file__).parent.parent
+
+
+class Settings(BaseSettings):  # Define Settings class inheriting from BaseSettings
+    # Model names
+    image_model: str = Field(
+        ..., alias="IMAGE_MODEL"
+    )  # Image model name from environment variable
+    translation_model: str = Field(
+        ..., alias="TRANSLATION_MODEL"
+    )  # Translation model name from environment variable
+
+    # Prompts
+    label_prompt: str = """  # Label detection prompt template string
+    You are a text region detection agent for machine translation workflows.
+    
+    **Task:** Identify and localize all text regions in the input image.
+    
+    **Input:** A single image containing text (e.g., speech bubbles, paragraphs, captions, signs).
+    
+    **Output Requirements:**
+    - Return a list of bounding boxes, one for each distinct text region
+    - Each bounding box must use normalized coordinates in the format:
+      - x1, y1: top-left corner coordinates
+      - x2, y2: bottom-right corner coordinates
+      - All coordinates are normalized to a 0-1000 scale 
+    
+    **Detection Guidelines:**
+    - Detect ALL visible text in the image, including:
+      - Speech bubbles and dialogue text
+      - Paragraphs and continuous text blocks
+      - Signs, labels, and captions
+      - Overlaid text and watermarks
+    - Each text region should have its own separate bounding box
+    - Bounding boxes should tightly fit around the text with minimal padding
+    - Group text that logically belongs together (e.g., text within the same speech bubble)
+    - Do not overlap bounding boxes unless text regions actually overlap in the image
+    """  # End of label prompt template
+
+    # Model settings (defaults – can be overridden by env vars)
+    qwen3_instruct_sampler: ModelSettings = (
+        ModelSettings(  # Qwen3 instruction model sampler configuration
+            temperature=0.7,  # Model temperature setting
+            extra_body={  # Additional model parameters
+                "top_p": 0.8,  # Nucleus sampling parameter
+                "top_k": 20,  # Top-k sampling parameter
+                "repetition_penalty": 1.0,  # Repetition penalty
+                "presence_penalty": 1.5,  # Presence penalty
+                "max_tokens": 16384,  # Maximum tokens to generate
+            },
+        )  # End of ModelSettings for instruct sampler
+    )
+
+    qwen3_thinking_sampler: ModelSettings = (
+        ModelSettings(  # Qwen3 thinking model sampler configuration
+            temperature=1.0,  # Model temperature setting
+            extra_body={  # Additional model parameters
+                "top_p": 0.95,  # Nucleus sampling parameter
+                "top_k": 20,  # Top-k sampling parameter
+                "presence_penalty": 0.0,  # Presence penalty
+                "repetition_penalty": 1.0,  # Repetition penalty
+                "max_tokens": 40960,  # Maximum tokens to generate
+            },
+        )
+    )  # End of ModelSettings for thinking sampler
+
+    # API endpoints
+    image_model_url: str = Field(
+        ..., alias="IMAGE_MODEL_URL"
+    )  # Image model API URL from environment variable
+    translation_model_url: str = Field(
+        ..., alias="TRANSLATION_MODEL_URL"
+    )  # Translation model API URL from environment variable
+
+    # Canvas dimensions
+    canvas_width: int = Field(
+        1000, alias="CANVAS_WIDTH"
+    )  # Canvas width for image processing
+    canvas_height: int = Field(
+        1000, alias="CANVAS_HEIGHT"
+    )  # Canvas height for image processing
+
+    # Translation prompt template
+    translate_prompt_template: str = """  # Translation prompt template string
+    You are a professional translator specializing in accurate and natural translations.
+    
+    **Task:** Translate the given text into {language}.
+    
+    **Requirements:**
+    - Provide ONLY the translated text without any explanations or additional commentary
+    - Preserve the original meaning, tone, and intent
+    - Ensure the translation sounds natural and fluent to native speakers
+    - Maintain any formatting, punctuation, or special characters where appropriate
+    - If the text is already in {language}, return it exactly as provided
+    - For proper nouns (names, places, brands), use standard transliterations if applicable
+    
+    **Input:** Text to be translated
+    **Output:** Translated text only
+    """
+
+    # Default translation language
+    default_translate_language: str = Field(
+        "english", alias="DEFAULT_TRANSLATE_LANGUAGE"
+    )
+
+    # Optional sampler overrides (can be supplied via env vars as JSON strings)
+    image_model_samplers: ModelSettings | None = None
+    translation_model_samplers: ModelSettings | None = None
+
+    # Optional generic LLM base URL (fallback for models not explicitly configured)
+    llm_base_url: str | None = (
+        None  # Generic LLM base URL (optional, falls back to specific model URLs)
+    )
+
+    # Make Settings immutable – aligns with 12‑factor & code‑quality immutability
+    model_config = SettingsConfigDict(
+        frozen=True,
+        extra="ignore",
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8",
+    )
+
+
+# Instantiate a singleton Settings object at import time (process start)
+settings = Settings()  # Create singleton Settings instance
+
+
+def get_settings() -> Settings:  # Function definition with return type hint
+    """Return the shared immutable Settings instance.
+
+    This function is the canonical way to retrieve configuration throughout the
+    codebase, enabling explicit dependency injection and easier testing.
+    """
+    return settings  # Return the singleton settings instance

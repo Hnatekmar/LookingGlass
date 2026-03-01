@@ -1,26 +1,42 @@
 import time
-from typing import Optional
+from typing import Optional, Type
 
 from pydantic_ai import ModelSettings, Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from app.common import logger
-from app.schema import AnnotationResponse
+from .config import Settings  # type hint for injected settings
+from .common import logger  # logger will be injected explicitly
+from .schema import AnnotationResponse, Label
 
 
 def build_chat_agent(
-    url: str,
     model: str,
     prompt: str,
-    output_type=AnnotationResponse,
-    settings: Optional[ModelSettings] = None,
+    output_type: Type = AnnotationResponse,
+    *,
+    settings_obj: Settings,
+    logger_obj,
+    settings_override: Optional[ModelSettings] = None,
 ) -> Agent:
-    # Create a custom SSL context to prevent SSL errors
+    # Determine the appropriate base URL based on the model being used
+    if model == settings_obj.image_model:
+        base_url = settings_obj.image_model_url
+    elif model == settings_obj.translation_model:
+        base_url = settings_obj.translation_model_url
+    else:
+        # Fallback: try to use a generic LLM_BASE_URL if defined, otherwise raise error
+        base_url = getattr(settings_obj, "llm_base_url", None)
+        if not base_url:
+            raise ValueError(
+                f"No URL configured for model '{model}'. "
+                f"Set IMAGE_MODEL_URL, TRANSLATION_MODEL_URL, or LLM_BASE_URL."
+            )
+
     chat_model = OpenAIChatModel(
         model_name=model,
         provider=OpenAIProvider(
-            base_url=url,
+            base_url=base_url,
         ),
     )
 
@@ -31,12 +47,21 @@ def build_chat_agent(
         "output_type": output_type,
     }
 
-    if settings is not None:
-        agent_kwargs["model_settings"] = settings
+    if settings_override is None:
+        if model == settings_obj.image_model:
+            agent_kwargs["model_settings"] = (
+                settings_obj.image_model_samplers or settings_obj.qwen3_instruct_sampler
+            )
+        elif model == settings_obj.translation_model:
+            agent_kwargs["model_settings"] = (
+                settings_obj.translation_model_samplers
+                or settings_obj.qwen3_instruct_sampler
+            )
+    else:
+        agent_kwargs["model_settings"] = settings_override
 
     agent = Agent(**agent_kwargs)
 
-    # Wrap the agent's run method to add timing
     original_run = agent.run
 
     async def timed_run(*args, **kwargs):
@@ -44,18 +69,17 @@ def build_chat_agent(
         try:
             result = await original_run(*args, **kwargs)
             end_time = time.perf_counter()
-            logger.info(
+            logger_obj.info(
                 f"Agent '{model}' call completed in {end_time - start_time:.3f}s"
             )
             return result
         except Exception as e:
             end_time = time.perf_counter()
-            logger.error(
+            logger_obj.error(
                 f"Agent '{model}' call failed after {end_time - start_time:.3f}s: {str(e)}"
             )
             raise
 
-    # Replace the run method with our timed version
     agent.run = timed_run
 
     return agent
