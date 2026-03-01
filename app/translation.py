@@ -1,30 +1,24 @@
 import asyncio
 from typing import List
 
-from app.common import (
-    logger,
-    TRANSLATION_MODEL,
-    translation_model_samplers,
-    LLM_BASE_URL,
-)
-from app.dependencies import build_chat_agent
+from app.common import logger
+from app.config import get_settings
+from app.container import get_chat_agent
 from app.schema import Label
 
 
 async def _translate_text(text: str, translate_language: str) -> str:
     """Translate a single text string to the specified language."""
     logger.info(f"Translation requested to {translate_language}")
-    TRANSLATE_PROMPT_TEMPLATE = f"""
-    Translate the following segment into {translate_language}, without additional explanation.
-
-    """
-    translate_prompt = TRANSLATE_PROMPT_TEMPLATE.format(language=translate_language)
-    translator = build_chat_agent(
-        f"{LLM_BASE_URL}/{TRANSLATION_MODEL}/v1",
-        TRANSLATION_MODEL,
-        translate_prompt,
-        settings=translation_model_samplers,
+    settings = get_settings()
+    translate_prompt = settings.translate_prompt_template.format(
+        language=translate_language
+    )
+    translator = get_chat_agent(
+        model=settings.translation_model,
+        prompt=translate_prompt,
         output_type=str,
+        settings_override=settings.translation_model_samplers,
     )
     logger.info("Translator agent built successfully")
 
@@ -39,17 +33,15 @@ async def _translate_labels(
 ) -> List[Label]:
     """Translate text in labels to the specified language."""
     logger.info(f"Translation requested to {translate_language}")
-    TRANSLATE_PROMPT_TEMPLATE = f"""
-    Translate the following segment into {translate_language}, without additional explanation.
-
-    """
-    translate_prompt = TRANSLATE_PROMPT_TEMPLATE.format(language=translate_language)
-    translator = build_chat_agent(
-        f"{LLM_BASE_URL}/{TRANSLATION_MODEL}/v1",
-        TRANSLATION_MODEL,
-        translate_prompt,
-        settings=translation_model_samplers,
+    settings = get_settings()
+    translate_prompt = settings.translate_prompt_template.format(
+        language=translate_language
+    )
+    translator = get_chat_agent(
+        model=settings.translation_model,
+        prompt=translate_prompt,
         output_type=str,
+        settings_override=settings.translation_model_samplers,
     )
     logger.info("Translator agent built successfully")
 

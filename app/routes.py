@@ -1,20 +1,64 @@
 import time
 
 from fastapi import UploadFile, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.common import logger
 from app.image_processing import _extract_labels_from_image
 from app.translation import _translate_labels, _translate_text
 
-app = FastAPI()
+# Configure CORS for Chrome extension and development
+# Note: redirect_slashes=False prevents 307 redirects that break CORS preflight
+app = FastAPI(redirect_slashes=False)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins - change for production
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 class TranslateRequest(BaseModel):
     text: str
 
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring and connection testing.
+    Returns the current status of the backend service.
+    :return: Health status response
+    """
+    return {
+        "status": "healthy",
+        "service": "Image Annotator Backend",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/")
+async def root():
+    """
+    Root endpoint providing basic service information.
+    :return: Service information
+    """
+    return {
+        "service": "Image Annotator Backend",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "translate": "/translate/",
+            "annotate": "/image/annotate/",
+        },
+    }
+
+
 @app.post("/translate/")
+@app.post("/translate")
 async def translate(request: TranslateRequest, target_language: str = "english"):
     """
     Post endpoint for text translation.
@@ -34,6 +78,7 @@ async def translate(request: TranslateRequest, target_language: str = "english")
 
 
 @app.post("/image/annotate/")
+@app.post("/image/annotate")
 async def annotate(
     data: UploadFile, translate: bool = False, translate_language: str = "english"
 ):

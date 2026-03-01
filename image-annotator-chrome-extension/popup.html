@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotator</title>
+    <style>
+        body {
+            width: 250px;
+            padding: 15px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            background-color: #f8f9fa;
+        }
+        
+        h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .info {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+        
+        .settings-link {
+            display: block;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+            text-align: center;
+        }
+        
+        .settings-link a {
+            color: #3498db;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        
+        .settings-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .current-settings {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        
+        .current-settings strong {
+            color: #2c3e50;
+        }
+        
+        .current-settings div {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h2>🖼️ Image Annotator</h2>
+    
+    <div id="status" class="status disconnected">
+        Checking connection...
+    </div>
+    
+    <div id="currentSettings" class="current-settings" style="display: none;">
+        <strong>Current Settings:</strong>
+        <div id="endpointDisplay"></div>
+        <div id="languageDisplay"></div>
+    </div>
+    
+    <div class="info">
+        Right-click on any image to annotate it or select text to translate.
+    </div>
+    
+    <div class="button-group">
+        <button id="testConnection" class="btn-secondary">🔍 Test Connection</button>
+    </div>
+    
+    <div class="settings-link">
+        <a id="openSettings" href="#">⚙️ Open Full Settings</a>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
