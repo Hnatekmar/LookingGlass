@@ -103,7 +103,7 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
         1000, alias="CANVAS_HEIGHT"
     )  # Canvas height for image processing
 
-    # Translation prompt template
+    # Translation prompt template (for individual text)
     translate_prompt_template: str = """  # Translation prompt template string
     You are a professional translator specializing in accurate and natural translations.
     
@@ -119,6 +119,37 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     
     **Input:** Text to be translated
     **Output:** Translated text only
+    """
+
+    # Batch translation prompt template (for multiple texts at once using JSON)
+    batch_translate_prompt_template: str = """  # Batch translation prompt template string
+    You are a professional translator specializing in accurate and natural translations.
+    
+    **Task:** Translate all texts in the JSON array into {language}.
+    
+    **Input Format:**
+    - JSON array of objects with "id" and "text" fields
+    - Example: `[{{"id": 0, "text": "Hello"}}, {{"id": 1, "text": "World"}}]`
+    
+    **Output Requirements:**
+    - Return a JSON array with the SAME structure
+    - Each object must have "id" (unchanged) and "translated_text" fields
+    - Example: `[{{"id": 0, "translated_text": "Bonjour"}}, {{"id": 1, "translated_text": "Monde"}}]`
+    
+    **Translation Rules:**
+    - Preserve the original meaning, tone, and intent for each item
+    - Ensure translations sound natural and fluent
+    - Maintain formatting, punctuation, or special characters where appropriate
+    - If any text is already in {language}, return it exactly as provided
+    - Match the input array length exactly (same number of items)
+    - Keep the same order and IDs as the input
+    
+    **Important:**
+    - Output must be VALID JSON only (no markdown, no explanations)
+    - Use double quotes for all strings
+    - Escape special characters properly in JSON
+    
+    Now translate the following texts into {language}:
     """
 
     # Default translation language

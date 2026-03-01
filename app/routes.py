@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.common import logger
 from app.image_processing import _extract_labels_from_image
-from app.translation import _translate_labels, _translate_text
+from app.translation import _translate_labels, _translate_labels_batch, _translate_text
 
 # Configure CORS for Chrome extension and development
 # Note: redirect_slashes=False prevents 307 redirects that break CORS preflight
@@ -102,9 +102,14 @@ async def annotate(
     # Step 2: Handle translation if requested
     if translate:
         translate_start = time.perf_counter()
-        response.labels = await _translate_labels(response.labels, translate_language)
+        # Use batch translation for efficiency (single request instead of N parallel requests)
+        response.labels = await _translate_labels_batch(
+            response.labels, translate_language
+        )
         translate_end = time.perf_counter()
-        logger.info(f"Step 2 (translation) took {translate_end - translate_start:.3f}s")
+        logger.info(
+            f"Step 2 (batch translation) took {translate_end - translate_start:.3f}s"
+        )
 
     total_duration = time.perf_counter() - start_time
     logger.info(f"Image annotation process completed in {total_duration:.3f}s")
