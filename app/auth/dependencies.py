@@ -1,6 +1,5 @@
 """Authentication dependencies for FastAPI routes."""
 
-from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
 
@@ -48,24 +47,3 @@ async def require_auth(
 
     return user_id
 
-
-async def get_current_user(
-    x_auth_code: str | None = Header(None, alias="X-Auth-Code"),
-    access_code_manager: AccessCodeManager = Depends(get_access_code_manager),
-) -> str | None:
-    """Optional dependency that returns user_id if authenticated, None otherwise.
-
-    Use this for endpoints that have optional authentication.
-
-    Args:
-        x_auth_code: The access code from the X-Auth-Code header.
-        access_code_manager: The access code manager for validation.
-
-    Returns:
-        The user_id if authenticated, None otherwise.
-    """
-    if x_auth_code is None:
-        return None
-
-    user_id = await access_code_manager.validate(x_auth_code)
-    return user_id  # Returns None if code is invalid

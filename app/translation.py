@@ -1,4 +1,3 @@
-import asyncio
 from typing import List
 from pydantic import BaseModel
 
@@ -6,13 +5,6 @@ from app.common import logger
 from app.config import get_settings
 from app.container import get_chat_agent
 from app.schema import Label
-
-
-class TranslationItem(BaseModel):
-    """Single item in the translation batch."""
-
-    id: int
-    text: str
 
 
 class TranslatedItem(BaseModel):
@@ -121,43 +113,4 @@ async def _translate_labels_batch(
             label.text = translated_map[i]
 
     logger.info(f"Updated {len(labels)} labels with batch translations")
-    return labels
-
-
-async def _translate_labels(
-    labels: List[Label], translate_language: str
-) -> List[Label]:
-    """
-    Translate text in labels to the specified language (individual requests).
-
-    Deprecated: Use _translate_labels_batch() for better efficiency.
-    This function is kept for backwards compatibility.
-    """
-    logger.info(
-        f"Individual translation requested for {len(labels)} labels to {translate_language}"
-    )
-    settings = get_settings()
-    translate_prompt = settings.translate_prompt_template.format(
-        language=translate_language
-    )
-    translator = get_chat_agent(
-        model=settings.translation_model,
-        prompt=translate_prompt,
-        output_type=str,
-        settings_override=settings.translation_model_samplers,
-    )
-    logger.info("Translator agent built successfully")
-
-    # Create translation tasks
-    translation_tasks = [translator.run(label.text) for label in labels]
-    logger.info(f"Created {len(translation_tasks)} individual translation tasks")
-
-    # Execute all translations concurrently
-    translated_results = await asyncio.gather(*translation_tasks)
-    logger.info("All individual translation tasks completed")
-
-    # Update labels with translated text
-    for label, result in zip(labels, translated_results):
-        label.text = result.output.lstrip()
-    logger.info("Translated results added to labels")
     return labels
