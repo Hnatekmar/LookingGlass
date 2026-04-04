@@ -7,14 +7,14 @@ import secrets
 # Configure pytest-asyncio
 pytest_plugins = ('pytest_asyncio',)
 
-class TestAccessCodeStore:
-    """Tests for AccessCodeStore class."""
+class TestInMemoryAccessCodeStore:
+    """Tests for InMemoryAccessCodeStore class."""
 
     @pytest.fixture
     def store(self):
         """Create a fresh AccessCodeStore for each test."""
-        from app.auth.store import AccessCodeStore
-        return AccessCodeStore()
+        from app.auth.store import InMemoryAccessCodeStore
+        return InMemoryAccessCodeStore()
 
     def test_generate_code_creates_new_code(self, store):
         """Test that generate_code creates a new cryptographically secure code."""
@@ -101,8 +101,8 @@ class TestAccessCodeManager:
     @pytest.fixture
     def store(self):
         """Create a fresh AccessCodeStore."""
-        from app.auth.store import AccessCodeStore
-        return AccessCodeStore()
+        from app.auth.store import InMemoryAccessCodeStore
+        return InMemoryAccessCodeStore()
 
     @pytest.fixture
     def manager(self, store, mock_oauth2_client):
@@ -119,15 +119,12 @@ class TestAccessCodeManager:
         mock_oauth2_client.exchange_code.return_value = mock_tokens
         mock_oauth2_client.verify_id_token.return_value = {"sub": "user-123"}
 
-        # Mock request object
-        mock_request = MagicMock()
-
         # Handle callback
         access_code = await manager.handle_callback(
             code="auth-code",
             state="state",
             redirect_uri="http://localhost/callback",
-            request=mock_request
+            code_verifier="test-verifier"
         )
 
         # Verify OAuth2 calls

@@ -2,10 +2,8 @@
 
 import logging
 import secrets
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import redis.asyncio as redis
+import redis.asyncio as redis
 
 from .store import AccessCodeStore
 
@@ -102,8 +100,10 @@ class RedisAccessCodeStore(AccessCodeStore):
             logger.debug(f"Generated new access code for user {user_id}")
             return code
 
-        except Exception as e:
-            logger.error(f"Failed to generate access code for user {user_id}: {e}")
+        except redis.RedisError as e:
+            logger.error(
+                f"Failed to generate access code for user {user_id}: {e}", exc_info=True
+            )
             raise RuntimeError(f"Failed to generate access code: {e}") from e
 
     def validate_code(self, code: str) -> str | None:
@@ -119,8 +119,8 @@ class RedisAccessCodeStore(AccessCodeStore):
         try:
             user_id = self._redis.get(self._make_code_key(code))
             return user_id.decode() if user_id else None
-        except Exception as e:
-            logger.error(f"Failed to validate access code: {e}")
+        except redis.RedisError as e:
+            logger.error(f"Failed to validate access code: {e}", exc_info=True)
             # Fail closed: return None on error
             return None
 
@@ -136,8 +136,8 @@ class RedisAccessCodeStore(AccessCodeStore):
         try:
             code = self._redis.get(self._make_user_key(user_id))
             return code.decode() if code else None
-        except Exception as e:
-            logger.error(f"Failed to get code for user {user_id}: {e}")
+        except redis.RedisError as e:
+            logger.error(f"Failed to get code for user {user_id}: {e}", exc_info=True)
             return None
 
     def regenerate_code(self, user_id: str) -> str:
@@ -177,6 +177,6 @@ class RedisAccessCodeStore(AccessCodeStore):
 
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to remove user {user_id}: {e}")
+        except redis.RedisError as e:
+            logger.error(f"Failed to remove user {user_id}: {e}", exc_info=True)
             return False
