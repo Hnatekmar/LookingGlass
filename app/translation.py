@@ -1,4 +1,7 @@
 from typing import List
+
+import json
+
 from pydantic import BaseModel
 
 from app.common import logger
@@ -35,6 +38,33 @@ async def _translate_text(text: str, translate_language: str) -> str:
     return result.output.lstrip()
 
 
+async def _translate_labels(
+    labels: List[Label], translate_language: str
+) -> List[Label]:
+    """
+    Translate all label texts individually using parallel API calls.
+
+    This is less efficient than batch translation:
+    - N API calls (one per label) instead of 1
+    - Higher latency due to sequential processing
+    - Inconsistent translation context across labels
+    """
+    if not labels:
+        return labels
+
+    logger.info(
+        f"Individual translation requested for {len(labels)} labels to {translate_language}"
+    )
+
+    # Translate each label individually
+    for label in labels:
+        label.text = await _translate_text(label.text, translate_language)
+
+    logger.info(f"Updated {len(labels)} labels with individual translations")
+    return labels
+
+
+
 async def _translate_labels_batch(
     labels: List[Label], translate_language: str
 ) -> List[Label]:
@@ -55,8 +85,6 @@ async def _translate_labels_batch(
     )
 
     # Prepare batched input as JSON string
-    import json
-
     batch_input = [{"id": i, "text": label.text} for i, label in enumerate(labels)]
     batch_input_str = json.dumps(batch_input, ensure_ascii=False)
 
@@ -84,8 +112,6 @@ async def _translate_labels_batch(
     # Handle different output formats
     if isinstance(translated_raw, str):
         # Parse JSON string
-        import json
-
         translated_list = json.loads(translated_raw)
         # Convert dicts to TranslatedItem objects
         translated_items = [

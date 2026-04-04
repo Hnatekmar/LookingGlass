@@ -67,8 +67,11 @@ def _get_redis_client() -> redis.Redis:
         asyncio.get_event_loop().run_until_complete(_redis_client.ping())
         _module_logger.info("Redis connection established")
         return _redis_client
+    except redis.RedisError as e:
+        _module_logger.error(f"Failed to connect to Redis: {e}", exc_info=True)
+        raise RuntimeError(f"Redis connection failed: {e}") from e
     except Exception as e:
-        _module_logger.error(f"Failed to connect to Redis: {e}")
+        _module_logger.error(f"Unexpected error connecting to Redis: {e}", exc_info=True)
         raise RuntimeError(f"Redis connection failed: {e}") from e
 
 

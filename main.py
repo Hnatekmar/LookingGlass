@@ -1,7 +1,7 @@
 # Import OS module for environment variable handling
 import os
 from app.config import get_settings
-from app.routes import app
+from app import app
 from app.common import logger
 
 # Import Uvicorn to run the ASGI application server

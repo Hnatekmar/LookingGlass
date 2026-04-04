@@ -2,15 +2,22 @@
 
 import base64
 import hashlib
+import logging
 import secrets
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse, urlencode
 
 import httpx
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 from jose import jwt, jwk
+from jose.backends import RSAKey
 from jose.exceptions import JWTError
 
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -114,9 +121,9 @@ class OAuth2Client:
     @staticmethod
     def _get_origin(url: str) -> str:
         """Extract origin (scheme + host + port) from URL."""
-        from urllib.parse import urlparse
-
         parsed = urlparse(url)
+
+        return f"{parsed.scheme}://{parsed.netloc}"
         return f"{parsed.scheme}://{parsed.netloc}"
 
     def _get_pkce_verifier(self) -> str:
@@ -247,28 +254,28 @@ class OAuth2Client:
                     try:
                         key = jwk.construct(jwk_key)
                         break
-                    except Exception:
+                    except jwk.JWKError as e:
                         # If direct construction fails, try extracting from x5c
                         if "x5c" in jwk_key:
-                            import base64
-                            from cryptography.hazmat.primitives import serialization
-                            from cryptography.hazmat.backends import default_backend
-                            
-                            # Extract certificate from x5c
-                            cert_pem = base64.b64decode(jwk_key["x5c"][0])
-                            public_key = serialization.load_pem_public_certificate(
-                                cert_pem, backend=default_backend()
-                            )
-                            # Convert to PEM format for jose
-                            key_pem = public_key.public_bytes(
-                                encoding=serialization.Encoding.PEM,
-                                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                            )
-                            # Load PEM key
-                            from jose.backends import RSAKey
-                            key = RSAKey(key=key_pem.decode())
-                            break
-            
+                            try:
+                                cert_pem = base64.b64decode(jwk_key["x5c"][0])
+                                public_key = serialization.load_pem_public_certificate(
+                                    cert_pem, backend=default_backend()
+                                )
+                                # Convert to PEM format for jose
+                                key_pem = public_key.public_bytes(
+                                    encoding=serialization.Encoding.PEM,
+                                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                                )
+                                # Load PEM key
+                                key = RSAKey(key=key_pem.decode())
+                                break
+                            except Exception as cert_e:
+                                logger.error(f"Failed to construct key from x5c: {cert_e}", exc_info=True)
+                                continue
+                    except Exception as e:
+                        logger.error(f"Failed to construct JWK: {e}", exc_info=True)
+                        continue
             if not key:
                 raise RuntimeError(f"No matching JWKS key found for kid: {key_id}")
             # Verify and decode token
@@ -327,8 +334,7 @@ class OAuth2Client:
         code_challenge = self._get_pkce_challenge(code_verifier)
         
         # Build query parameters
-        from urllib.parse import urlencode
-        
+
         params = {
             "response_type": "code",
             "client_id": self._settings.oauth2_client_id,
