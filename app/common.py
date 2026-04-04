@@ -1,9 +1,5 @@
 import logging
-from pydantic_ai import ModelSettings
-from app.settings import Settings
-
-# Create a singleton instance of Settings
-settings = Settings()
+from app.config import settings
 
 # Import configuration from Settings instance
 LLM_BASE_URL = settings.llm_base_url
@@ -14,7 +10,7 @@ LABEL_PROMPT = settings.label_prompt
 # Import model samplers from Settings instance
 qwen3_instruct_sampler = settings.qwen3_instruct_sampler
 qwen3_thinking_sampler = settings.qwen3_thinking_sampler
-deepseek_ocr_sampler = settings.deepseek_ocr_sampler
+
 image_model_samplers = settings.image_model_samplers
 translation_model_samplers = settings.translation_model_samplers
 

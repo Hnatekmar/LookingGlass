@@ -239,6 +239,19 @@
             <input type="text" id="annotateEndpoint" placeholder="/image/annotate" value="/image/annotate">
         </div>
     </div>
+
+    <div class="settings-section">
+        <h2>Authentication</h2>
+        
+        <div class="form-group">
+            <label for="accessCode">Access Code</label>
+            <p class="description">
+                Your authentication access code. Get or regenerate your code from the backend's <a href="#" id="getAccessCodeLink" target="_blank">access code page</a>.
+            </p>
+            <input type="text" id="accessCode" placeholder="Enter your access code">
+            <button type="button" id="getAccessCodeBtn" class="btn-secondary" style="margin-top: 10px;">🔑 Get/Regenerate Access Code</button>
+        </div>
+    </div>
     
     <div class="settings-section">
         <h2>Translation Settings</h2>
@@ -246,27 +259,19 @@
         <div class="form-group">
             <label for="targetLanguage">Target Language</label>
             <p class="description">
-                The language into which text and image labels will be translated.
+                The language to translate text into.
             </p>
             <select id="targetLanguage">
                 <option value="english">English</option>
-                <option value="spanish">Spanish (Español)</option>
-                <option value="french">French (Français)</option>
-                <option value="german">German (Deutsch)</option>
-                <option value="italian">Italian (Italiano)</option>
-                <option value="portuguese">Portuguese (Português)</option>
-                <option value="russian">Russian (Русский)</option>
-                <option value="japanese">Japanese (日本語)</option>
-                <option value="chinese">Chinese (中文)</option>
-                <option value="korean">Korean (한국어)</option>
-                <option value="arabic">Arabic (العربية)</option>
-                <option value="hindi">Hindi (हिन्दी)</option>
-                <option value="dutch">Dutch (Nederlands)</option>
-                <option value="polish">Polish (Polski)</option>
-                <option value="turkish">Turkish (Türkçe)</option>
-                <option value="vietnamese">Vietnamese (Tiếng Việt)</option>
-                <option value="thai">Thai (ไทย)</option>
-                <option value="none">No Translation</option>
+                <option value="chinese">Chinese</option>
+                <option value="spanish">Spanish</option>
+                <option value="french">French</option>
+                <option value="german">German</option>
+                <option value="japanese">Japanese</option>
+                <option value="korean">Korean</option>
+                <option value="russian">Russian</option>
+                <option value="arabic">Arabic</option>
+                <option value="portuguese">Portuguese</option>
             </select>
         </div>
     </div>
@@ -275,7 +280,6 @@
         <button type="button" id="saveBtn" class="btn-primary">💾 Save Settings</button>
         <button type="button" id="resetBtn" class="btn-secondary">↺ Reset to Defaults</button>
     </div>
-    
     <div id="saveMessage"></div>
     
     <script src="options.js"></script>

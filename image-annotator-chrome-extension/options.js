@@ -5,7 +5,8 @@ const DEFAULT_SETTINGS = {
     backendEndpoint: 'http://localhost:8000',
     translateEndpoint: '/translate',
     annotateEndpoint: '/image/annotate',
-    targetLanguage: 'english'
+    targetLanguage: 'english',
+    accessCode: ''
 };
 
 // Load settings from Chrome storage
@@ -15,21 +16,26 @@ function loadSettings() {
         document.getElementById('translateEndpoint').value = settings.translateEndpoint;
         document.getElementById('annotateEndpoint').value = settings.annotateEndpoint;
         document.getElementById('targetLanguage').value = settings.targetLanguage;
+        document.getElementById('accessCode').value = settings.accessCode || '';
+
+        // Set the access code page link
+        const backendUrl = settings.backendEndpoint || DEFAULT_SETTINGS.backendEndpoint;
+        document.getElementById('getAccessCodeLink').href = `${backendUrl}/auth/access-code`;
     });
 }
 
-// Save settings to Chrome storage
 function saveSettings() {
     const settings = {
-        backendEndpoint: document.getElementById('backendEndpoint').value.trim(),
-        translateEndpoint: document.getElementById('translateEndpoint').value.trim(),
-        annotateEndpoint: document.getElementById('annotateEndpoint').value.trim(),
-        targetLanguage: document.getElementById('targetLanguage').value
+        backendEndpoint: document.getElementById("backendEndpoint").value.trim(),
+        translateEndpoint: document.getElementById("translateEndpoint").value.trim(),
+        annotateEndpoint: document.getElementById("annotateEndpoint").value.trim(),
+        targetLanguage: document.getElementById("targetLanguage").value,
+        accessCode: document.getElementById("accessCode").value.trim()
     };
     
     // Validate backend endpoint
     if (!settings.backendEndpoint) {
-        showSaveMessage('Backend endpoint is required', 'error');
+        showSaveMessage("Backend endpoint is required", "error");
         return;
     }
     
@@ -39,10 +45,13 @@ function saveSettings() {
         return;
     }
     
+    console.log('Saving settings:', settings);  // Debug log
     chrome.storage.sync.set(settings, () => {
         if (chrome.runtime.lastError) {
+            console.error('Chrome storage error:', chrome.runtime.lastError);  // Debug log
             showSaveMessage('Error saving settings: ' + chrome.runtime.lastError.message, 'error');
         } else {
+            console.log('Settings saved successfully');  // Debug log
             showSaveMessage('Settings saved successfully!', 'success');
             
             // Broadcast settings update to all tabs
@@ -132,13 +141,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Test connection button
     document.getElementById('testConnection').addEventListener('click', testConnection);
-    
-    // Preset endpoint buttons
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.getElementById('backendEndpoint').value = e.target.dataset.endpoint;
-        });
+
+    // Get access code button
+    document.getElementById('getAccessCodeBtn').addEventListener('click', () => {
+        const backendUrl = document.getElementById('backendEndpoint').value.trim() || DEFAULT_SETTINGS.backendEndpoint;
+        const accessCodePage = `${backendUrl}/auth/access-code`;
+        window.open(accessCodePage, '_blank');
     });
+
+    // Preset endpoint buttons
     
     // Save on Enter key in input fields
     document.querySelectorAll('input[type="text"], input[type="url"]').forEach(input => {
