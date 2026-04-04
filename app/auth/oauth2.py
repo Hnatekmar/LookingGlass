@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from jose import jwt, jws, jwk
+from jose import jwt, jwk
 from jose.exceptions import JWTError
 
 from app.config import Settings

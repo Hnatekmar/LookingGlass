@@ -1,6 +1,5 @@
 import time
 import secrets
-from urllib.parse import urlencode
 
 from fastapi import UploadFile, FastAPI, Depends, Request
 from fastapi.responses import RedirectResponse
@@ -9,7 +8,7 @@ from pydantic import BaseModel
 
 from app.common import logger
 from app.image_processing import _extract_labels_from_image
-from app.translation import _translate_labels, _translate_labels_batch, _translate_text
+from app.translation import _translate_labels_batch, _translate_text
 from app.auth.dependencies import require_auth
 from app.auth.access_code import AccessCodeManager
 from app.container import get_access_code_manager
@@ -124,6 +123,7 @@ async def annotate(
     user_id: str = Depends(require_auth),
     _access_code_manager: AccessCodeManager = Depends(lambda: access_code_manager_instance),
 ):
+
     """
     Post endpoint for image annotation processing.
     This endpoint accepts an image file upload and optional translation parameters
@@ -132,7 +132,7 @@ async def annotate(
     Requires valid authentication via X-Auth-Code header.
     :param data: Uploaded image file to be annotated
     :param translate: Flag indicating whether to perform language translation on detected text
-    :param translate_language: Target language for text translation, defaults to 'english'
+    :param translate_language: Target language for text translation, defaults to "english"
     :param user_id: Authenticated user ID (from require_auth dependency)
     :param _access_code_manager: Access code manager dependency
     :return: Processed image annotation response

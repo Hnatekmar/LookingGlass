@@ -1,7 +1,6 @@
 """Authentication routes for OAuth2 flow and access code management."""
 
 import secrets
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse

@@ -17,8 +17,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from .config import get_settings, Settings  # type hint for injected settings
-from .common import logger  # logger will be injected explicitly
-from .schema import AnnotationResponse, Label
+from .schema import AnnotationResponse
 from .auth.store import AccessCodeStore, InMemoryAccessCodeStore
 from .auth.store_redis import RedisAccessCodeStore
 from .auth.oauth2 import OAuth2Client
@@ -140,15 +139,6 @@ def get_access_code_manager() -> AccessCodeManager:
 
     return _access_code_manager
 
-
-async def close_redis_connection() -> None:
-    """Close Redis connection on app shutdown."""
-    global _redis_client
-
-    if _redis_client is not None:
-        await _redis_client.aclose()
-        _module_logger.info("Redis connection closed")
-        _redis_client = None
 
 
 def get_chat_agent(
