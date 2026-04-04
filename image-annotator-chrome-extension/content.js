@@ -231,15 +231,17 @@
         loadingIndicator.appendChild(spinner);
 
         // Send message to background script for translation
+        console.log("Content script sending translate-text message:", text.substring(0, 20));
         chrome.runtime.sendMessage({
             action: "translate-text",
             text: text,
             settings: settings
         }, function(response) {
+            console.log("Content script received response:", response);
             if (loadingIndicator.parentNode) {
                 loadingIndicator.parentNode.removeChild(loadingIndicator);
             }
-
+            
             if (response && response.success && response.translatedText) {
                 // Try to find and replace the selected text
                 const selection = window.getSelection();
@@ -368,9 +370,15 @@
                             url += `?translate=true&translate_language=${settings.targetLanguage}`;
                         }
                         
-                        // Send directly to backend
+                        // Debug: log access code status
+                        console.log('Sending request with accessCode:', settings.accessCode ? 'present' : 'MISSING');
+                        
+                        // Send directly to backend with authentication
                         fetch(url, {
                             method: 'POST',
+                            headers: {
+                                'X-Auth-Code': settings.accessCode || ''
+                            },
                             body: formData
                         })
                         .then(response => response.json())

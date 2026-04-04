@@ -5,7 +5,8 @@ const DEFAULT_SETTINGS = {
     backendEndpoint: 'http://localhost:8000',
     translateEndpoint: '/translate',
     annotateEndpoint: '/image/annotate',
-    targetLanguage: 'english'
+    targetLanguage: 'english',
+    accessCode: ''
 };
 
 // Load settings from storage
@@ -20,6 +21,25 @@ function buildEndpointUrl(endpointPath, settings) {
     const basePath = settings.backendEndpoint.replace(/\/$/, ''); // Remove trailing slash
     const endpoint = endpointPath.replace(/^\//, ''); // Remove leading slash
     return `${basePath}/${endpoint}`;
+}
+
+// Make authenticated fetch request
+async function authenticatedFetch(url, options = {}) {
+    const settings = await getSettings();
+    
+    const headers = options.headers || {};
+    if (settings.accessCode) {
+        headers["X-Auth-Code"] = settings.accessCode;
+    }
+    
+    const response = await fetch(url, { ...options, headers });
+    
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+        throw new Error('Authentication required. Please configure your access code in extension settings.');
+    }
+    
+    return response;
 }
 
 // Create context menu items when extension is installed
@@ -82,6 +102,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log("Background received message:", request.action);
+    
     if (request.action === "fetch-image-blob") {
         // Fetch image blob from background script to bypass CORS
         fetch(request.imageUrl, {
@@ -126,30 +148,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === "translate-text") {
+        console.log("Background script received translate-text request");
         getSettings().then(settings => {
+            console.log("Translation settings:", settings);
             const url = buildEndpointUrl(settings.translateEndpoint, settings);
             
             // If no translation language is set, just return the original text
-            if (!settings.targetLanguage || settings.targetLanguage === 'none') {
-                sendResponse({ 
-                    success: true, 
+            if (!settings.targetLanguage || settings.targetLanguage === "none") {
+                console.log("Translation disabled in settings");
+                sendResponse({
+                    success: true,
                     translatedText: request.text,
-                    message: 'Translation disabled in settings'
+                    message: "Translation disabled in settings"
                 });
                 return;
             }
             
             const targetUrl = `${url}?target_language=${settings.targetLanguage}`;
+            console.log("Sending translation request to:", targetUrl);
+            // Add authentication header
+            const headers = {
+                "Content-Type": "application/json"
+            };
+            if (settings.accessCode) {
+                headers["X-Auth-Code"] = settings.accessCode;
+            }
             
             fetch(targetUrl, {
                 method: 'POST',
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: headers,
                 body: JSON.stringify({ text: request.text })
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log("Translation API response status:", response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log("Translation API response data:", data);
                 sendResponse({ success: true, translatedText: data.translated_text });
             })
             .catch(error => {

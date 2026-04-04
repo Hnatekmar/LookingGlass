@@ -185,6 +185,40 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
         None  # Generic LLM base URL (optional, falls back to specific model URLs)
     )
 
+    # OAuth2 Configuration
+    # OpenID Connect Discovery (preferred) - provide only issuer URL
+    oauth2_issuer: str | None = Field(None, alias="OAUTH2_ISSUER")
+
+    # Manual configuration (fallback) - explicit endpoints
+    oauth2_authorize_url: str | None = Field(None, alias="OAUTH2_AUTHORIZE_URL")
+    oauth2_token_url: str | None = Field(None, alias="OAUTH2_TOKEN_URL")
+    oauth2_jwks_url: str | None = Field(None, alias="OAUTH2_JWKS_URL")
+
+    # Common OAuth2 settings (optional - only required when OAuth2 is enabled)
+    oauth2_client_id: str | None = Field(None, alias="OAUTH2_CLIENT_ID")
+    oauth2_client_secret: str | None = Field(None, alias="OAUTH2_CLIENT_SECRET")
+    oauth2_redirect_uri: str | None = Field(None, alias="OAUTH2_REDIRECT_URI")
+    oauth2_scopes: str = Field("openid profile email", alias="OAUTH2_SCOPES")
+    # Session secret key for cookie-based session management (required for OAuth2 state)
+    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+    # WARNING: Using a default development key - DO NOT use in production!
+    session_secret_key: str = Field(
+
+        "dev-secret-key-change-in-production", alias="SESSION_SECRET_KEY"
+
+    )
+
+    # Redis Configuration
+    # Redis URL for persistent access code storage (optional, falls back to in-memory)
+    # Format: redis://host:port/db or rediss://host:port/db for TLS
+    # Example: redis://localhost:6379/0 or redis://user:pass@redis.example.com:6379/0
+    redis_url: str | None = Field(None, alias="REDIS_URL")
+
+    # Access code TTL in seconds (default: 24 hours = 86400)
+    # How long access codes remain valid before expiring
+    access_code_ttl: int = Field(86400, alias="ACCESS_CODE_TTL")
+
+
     # Make Settings immutable – aligns with 12‑factor & code‑quality immutability
     model_config = SettingsConfigDict(
         frozen=True,
@@ -192,7 +226,6 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
         env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
     )
-
 
 # Instantiate a singleton Settings object at import time (process start)
 settings = Settings()  # Create singleton Settings instance

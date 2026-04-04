@@ -94,7 +94,31 @@ secrets:
   imageModelUrl: ""
   # -- Translation model API endpoint
   translationModelUrl: ""
-
+  # -- OAuth2 Client ID
+  oauth2ClientId: ""
+  # -- OAuth2 Client Secret
+  oauth2ClientSecret: ""
+  # -- OAuth2 Redirect URI (must match provider configuration)
+  oauth2RedirectUri: ""
+  # -- OAuth2 Issuer URL (for OIDC discovery)
+  oauth2Issuer: ""
+  # -- OAuth2 Scopes (space-separated)
+  oauth2Scopes: "openid profile email"
+  # -- Session secret key for cookie-based session management (REQUIRED for OAuth2)
+  # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+  sessionSecretKey: ""
+  # -- Optional: Manual OAuth2 endpoints (if OIDC discovery not available)
+  oauth2AuthorizeUrl: ""
+  oauth2TokenUrl: ""
+  oauth2JwksUrl: ""
+  # -- Redis URL for persistent access code storage (recommended for production)
+  # Format: redis://host:port/db or use secret reference
+  # Example: redis://redis-master:6379/0
+  redisUrl: ""
+  # -- Redis password (optional, use with redisUrl containing username)
+  redisPassword: ""
+  # -- Access code TTL in seconds (default: 86400 = 24 hours)
+  accessCodeTtl: "86400"
 # -- Liveness probe configuration
 livenessProbe:
   enabled: true
