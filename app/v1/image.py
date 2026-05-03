@@ -3,13 +3,14 @@
 import time
 import logging
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.auth.access_code import AccessCodeManager
 from app.auth.dependencies import require_auth
 from app.container import get_access_code_manager
 from app.image_processing import _extract_labels_from_image
 from app.translation import _translate_labels_batch
+from app.v1 import SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,13 @@ async def annotate(
     """
     logger.info(f"Starting image annotation process for user {user_id}")
     start_time = time.perf_counter()  # total processing start
+    
+    if translate_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported language: '{translate_language}'. "
+                   f"Supported: {', '.join(sorted(SUPPORTED_LANGUAGES - {'none'}))}"
+        )
 
     binary_image = await data.read()
 

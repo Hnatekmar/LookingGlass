@@ -17,6 +17,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from .config import get_settings, Settings  # type hint for injected settings
+from .common import logger
 from .schema import AnnotationResponse
 from .auth.store import AccessCodeStore, InMemoryAccessCodeStore
 from .auth.store_redis import RedisAccessCodeStore

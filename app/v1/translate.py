@@ -3,13 +3,14 @@
 import time
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth.access_code import AccessCodeManager
 from app.auth.dependencies import require_auth
 from app.container import get_access_code_manager
 from app.translation import _translate_text
+from app.v1 import SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,14 @@ async def translate(
     :param _access_code_manager: Access code manager dependency
     :return: Translated text response
     """
+    # Reject unknown language names to prevent prompt injection
+    if target_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported language: '{target_language}'. "
+                   f"Supported: {', '.join(sorted(SUPPORTED_LANGUAGES - {'none'}))}"
+        )
+
     logger.info(f"Starting translation to {target_language} for user {user_id}")
     start_time = time.perf_counter()
 
