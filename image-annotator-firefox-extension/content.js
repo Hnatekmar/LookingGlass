@@ -150,17 +150,71 @@ function displayLabelsOnImage(labels, imgElement) {
     if (label.text) {
       const textSpan = document.createElement("span");
       textSpan.textContent = label.text;
+      textSpan.className = "image-label-text";
+      textSpan.dataset.fullText = label.text;
       textSpan.style.cssText = `
         padding: 2px 4px;
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0);
         border-radius: 2px;
         font-size: 12px;
         max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        transition: background 0.2s ease, color 0.2s ease;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        font-weight: 500;
       `;
+      
+      // Create tooltip element (positioned absolutely relative to overlay)
+      const tooltip = document.createElement("div");
+      tooltip.className = "image-label-tooltip";
+      tooltip.textContent = label.text.replace(/\n/g, " "); // Replace newlines with spaces for display
+      const labelWidth = (label.x2 - label.x1) * imgRect.width;
+      const labelHeight = (label.y2 - label.y1) * imgRect.height;
+      tooltip.style.cssText = `
+        position: absolute;
+        background: rgba(255, 255, 255, 0.98);
+        color: #333;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-width: ${Math.max(labelWidth, 200)}px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        pointer-events: none;
+        z-index: 2147483647;
+        display: none;
+        left: ${label.x1 * imgRect.width + (labelWidth / 2)}px;
+        top: ${label.y1 * imgRect.height + (labelHeight / 2)}px;
+        transform: translate(-50%, -50%);
+        min-width: ${labelWidth}px;
+        text-align: center;
+      `;
+      
+      // Show tooltip on hover - update position dynamically
+      labelDiv.addEventListener("mouseenter", (e) => {
+        e.stopPropagation();
+        // Recalculate position on each hover to account for any layout changes
+        const labelRect = labelDiv.getBoundingClientRect();
+        const containerRect = overlay.getBoundingClientRect();
+        const relativeLeft = labelRect.left - containerRect.left + (labelRect.width / 2);
+        const relativeTop = labelRect.top - containerRect.top + (labelRect.height / 2);
+        tooltip.style.left = `${relativeLeft}px`;
+        tooltip.style.top = `${relativeTop}px`;
+        tooltip.style.display = "block";
+        console.log("[Image Annotator] Tooltip shown for:", label.text);
+      });
+      
+      labelDiv.addEventListener("mouseleave", (e) => {
+        e.stopPropagation();
+        tooltip.style.display = "none";
+      });
+      
       labelDiv.appendChild(textSpan);
+      overlay.appendChild(tooltip);
     }
 
     // Click to remove

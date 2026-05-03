@@ -1,5 +1,8 @@
 import io
-from typing import List
+import hashlib
+import time
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass, field
 
 from PIL import Image
 from pydantic_ai import BinaryContent
@@ -12,6 +15,108 @@ from app.schema import Label, AnnotationResponse
 
 # Load immutable settings once for this module
 settings = get_settings()
+
+# In-memory cache for image annotations
+# Structure: {cache_key: {"response": AnnotationResponse, "timestamp": float}}
+_image_annotation_cache: Dict[str, Dict[str, Any]] = {}
+_cache_ttl_seconds = 3600  # 1 hour default TTL
+_max_cache_size = 1000  # Maximum number of cached items
+
+
+@dataclass
+class CacheStats:
+    """Cache statistics."""
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+    
+    @property
+    def hit_rate(self) -> float:
+        total = self.hits + self.misses
+        return self.hits / total if total > 0 else 0.0
+
+
+_cache_stats = CacheStats()
+
+
+def get_image_hash(binary_image: bytes) -> str:
+    """Generate a SHA256 hash of the image content.
+    
+    Args:
+        binary_image: Raw image bytes
+        
+    Returns:
+        Hexadecimal hash string
+    """
+    return hashlib.sha256(binary_image).hexdigest()
+
+
+def _clean_cache():
+    """Remove expired entries from the cache."""
+    current_time = time.time()
+    expired_keys = [
+        key for key, value in _image_annotation_cache.items()
+        if current_time - value["timestamp"] > _cache_ttl_seconds
+    ]
+    for key in expired_keys:
+        del _image_annotation_cache[key]
+        _cache_stats.evictions += 1
+    
+    # Also enforce max size
+    if len(_image_annotation_cache) > _max_cache_size:
+        # Remove oldest entries
+        sorted_keys = sorted(
+            _image_annotation_cache.keys(),
+            key=lambda k: _image_annotation_cache[k]["timestamp"]
+        )
+        keys_to_remove = sorted_keys[:len(_image_annotation_cache) - _max_cache_size]
+        for key in keys_to_remove:
+            del _image_annotation_cache[key]
+            _cache_stats.evictions += 1
+
+
+async def extract_labels_with_cache(
+    binary_image: bytes,
+    image_hash: str,
+    cache_key: str
+) -> AnnotationResponse:
+    """Extract labels from image with caching support.
+    
+    Args:
+        binary_image: Raw image bytes
+        image_hash: Pre-computed image hash
+        cache_key: Cache key for lookup
+        
+    Returns:
+        AnnotationResponse with extracted labels
+    """
+    global _cache_stats
+    
+    # Clean expired entries periodically
+    if len(_image_annotation_cache) % 100 == 0:
+        _clean_cache()
+    
+    # Check cache
+    if cache_key in _image_annotation_cache:
+        cached = _image_annotation_cache[cache_key]
+        if time.time() - cached["timestamp"] <= _cache_ttl_seconds:
+            _cache_stats.hits += 1
+            logger.info(f"Cache hit for image annotation (hash: {image_hash[:16]}...)")
+            return cached["response"]
+    
+    # Cache miss - process image
+    _cache_stats.misses += 1
+    logger.info(f"Cache miss for image annotation (hash: {image_hash[:16]}...)")
+    
+    response = await _extract_labels_from_image(binary_image)
+    
+    # Store in cache
+    _image_annotation_cache[cache_key] = {
+        "response": response,
+        "timestamp": time.time()
+    }
+    
+    return response
 
 
 async def prepare_image_for_ocr(upload_file: bytes) -> bytes:

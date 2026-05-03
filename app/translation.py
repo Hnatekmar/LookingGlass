@@ -1,4 +1,7 @@
-from typing import List
+import hashlib
+import time
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
 
 import json
 
@@ -15,6 +18,115 @@ class TranslatedItem(BaseModel):
 
     id: int
     translated_text: str
+
+
+# In-memory cache for translations
+# Structure: {cache_key: {"labels": List[Label], "timestamp": float}}
+_translation_cache: Dict[str, Dict[str, Any]] = {}
+_cache_ttl_seconds = 3600  # 1 hour default TTL
+_max_cache_size = 1000  # Maximum number of cached items
+
+
+@dataclass
+class TranslationCacheStats:
+    """Translation cache statistics."""
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+    
+    @property
+    def hit_rate(self) -> float:
+        total = self.hits + self.misses
+        return self.hits / total if total > 0 else 0.0
+
+
+_translation_cache_stats = TranslationCacheStats()
+
+
+def get_translation_cache_key(image_hash: str, language: str) -> str:
+    """Generate a cache key for translation results.
+    
+    Args:
+        image_hash: SHA256 hash of the source image
+        language: Target translation language
+        
+    Returns:
+        Cache key string
+    """
+    return f"translation:{image_hash}:{language}"
+
+
+def _clean_translation_cache():
+    """Remove expired entries from the translation cache."""
+    current_time = time.time()
+    expired_keys = [
+        key for key, value in _translation_cache.items()
+        if current_time - value["timestamp"] > _cache_ttl_seconds
+    ]
+    for key in expired_keys:
+        del _translation_cache[key]
+        _translation_cache_stats.evictions += 1
+    
+    # Also enforce max size
+    if len(_translation_cache) > _max_cache_size:
+        # Remove oldest entries
+        sorted_keys = sorted(
+            _translation_cache.keys(),
+            key=lambda k: _translation_cache[k]["timestamp"]
+        )
+        keys_to_remove = sorted_keys[:len(_translation_cache) - _max_cache_size]
+        for key in keys_to_remove:
+            del _translation_cache[key]
+            _translation_cache_stats.evictions += 1
+
+
+async def translate_labels_with_cache(
+    labels: List[Label],
+    translate_language: str,
+    image_hash: str
+) -> List[Label]:
+    """Translate labels with caching support.
+    
+    Args:
+        labels: List of labels to translate
+        translate_language: Target language for translation
+        image_hash: SHA256 hash of the source image
+        
+    Returns:
+        List of labels with translated text
+    """
+    global _translation_cache_stats
+    
+    # Generate cache key
+    cache_key = get_translation_cache_key(image_hash, translate_language)
+    
+    # Clean expired entries periodically
+    if len(_translation_cache) % 100 == 0:
+        _clean_translation_cache()
+    
+    # Check cache
+    if cache_key in _translation_cache:
+        cached = _translation_cache[cache_key]
+        if time.time() - cached["timestamp"] <= _cache_ttl_seconds:
+            _translation_cache_stats.hits += 1
+            logger.info(f"Cache hit for translation to {translate_language} (hash: {image_hash[:16]}...)")
+            # Return a copy to prevent mutation of cached data
+            cached_labels = cached["labels"]
+            return [Label(text=l.text, x1=l.x1, x2=l.x2, y1=l.y1, y2=l.y2) for l in cached_labels]
+    
+    # Cache miss - perform translation
+    _translation_cache_stats.misses += 1
+    logger.info(f"Cache miss for translation to {translate_language} (hash: {image_hash[:16]}...)")
+    
+    translated_labels = await _translate_labels_batch(labels, translate_language)
+    
+    # Store in cache (store a copy to prevent mutation)
+    _translation_cache[cache_key] = {
+        "labels": [Label(text=l.text, x1=l.x1, x2=l.x2, y1=l.y1, y2=l.y2) for l in translated_labels],
+        "timestamp": time.time()
+    }
+    
+    return translated_labels
 
 
 async def _translate_text(text: str, translate_language: str) -> str:

@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from app.auth.access_code import AccessCodeManager
 from app.auth.dependencies import require_auth
 from app.container import get_access_code_manager
-from app.image_processing import _extract_labels_from_image
-from app.translation import _translate_labels_batch
+from app.image_processing import get_image_hash, extract_labels_with_cache, _cache_stats, _clean_cache
+from app.translation import translate_labels_with_cache, _translation_cache_stats, _clean_translation_cache
 from app.v1 import SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,63 @@ router = APIRouter(prefix="/image", tags=["image"])
 
 # Create singleton access code manager for routes
 access_code_manager_instance = get_access_code_manager()
+
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics for monitoring.
+    
+    Returns current hit/miss rates and cache size for both image annotation and translation caches.
+    """
+    # Import here to avoid circular imports
+    from app.image_processing import _image_annotation_cache
+    from app.translation import _translation_cache
+    
+    # Clean caches before reporting stats
+    _clean_cache()
+    _clean_translation_cache()
+    
+    return {
+        "image_annotation": {
+            "hits": _cache_stats.hits,
+            "misses": _cache_stats.misses,
+            "evictions": _cache_stats.evictions,
+            "hit_rate": _cache_stats.hit_rate,
+            "cache_size": len(_image_annotation_cache)
+        },
+        "translation": {
+            "hits": _translation_cache_stats.hits,
+            "misses": _translation_cache_stats.misses,
+            "evictions": _translation_cache_stats.evictions,
+            "hit_rate": _translation_cache_stats.hit_rate,
+            "cache_size": len(_translation_cache)
+        }
+    }
+
+
+@router.delete("/cache")
+async def clear_cache():
+    """Clear all cached image annotations and translations.
+    
+    Useful for forcing fresh processing after model updates or configuration changes.
+    """
+    from app.image_processing import _image_annotation_cache
+    from app.translation import _translation_cache
+    
+    image_count = len(_image_annotation_cache)
+    translation_count = len(_translation_cache)
+    
+    _image_annotation_cache.clear()
+    _translation_cache.clear()
+    
+    logger.info(f"Cache cleared: {image_count} image annotations, {translation_count} translations")
+    
+    return {
+        "cleared": {
+            "image_annotations": image_count,
+            "translations": translation_count
+        }
+    }
 
 
 @router.post("/annotate/")
@@ -53,15 +110,20 @@ async def annotate(
         )
 
     binary_image = await data.read()
-
-    response = await _extract_labels_from_image(binary_image)
+    
+    # Generate cache key for image extraction
+    image_hash = get_image_hash(binary_image)
+    cache_key = f"image:{image_hash}"
+    
+    # Try to get extracted labels from cache
+    response = await extract_labels_with_cache(binary_image, image_hash, cache_key)
 
     # Step 2: Handle translation if requested
     if translate:
         translate_start = time.perf_counter()
         # Use batch translation for efficiency (single request instead of N parallel requests)
-        response.labels = await _translate_labels_batch(
-            response.labels, translate_language
+        response.labels = await translate_labels_with_cache(
+            response.labels, translate_language, image_hash
         )
         translate_end = time.perf_counter()
         logger.info(

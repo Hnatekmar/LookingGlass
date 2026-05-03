@@ -16,3 +16,4 @@ __pycache__/
 
 # Temporary files
 .tmp/
+dist/
