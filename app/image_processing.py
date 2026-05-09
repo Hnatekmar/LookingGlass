@@ -150,6 +150,51 @@ async def prepare_image_for_ocr(upload_file: bytes) -> bytes:
     return output.getvalue()
 
 
+async def _prepare_image_for_detection(upload_file: bytes) -> bytes:
+    """Prepare image for text detection (VLM-based).
+
+    Converts to RGB, resizes to max 1024px, and enhances contrast.
+    Keeps COLOR information and improves text visibility on dark backgrounds.
+    """
+    from PIL import ImageEnhance
+    
+    image_data = io.BytesIO(upload_file)
+    img = Image.open(image_data)
+
+    # Convert to RGB if necessary (handles RGBA, grayscale, palette modes)
+    if img.mode != "RGB":
+        if img.mode in ("RGBA", "LA", "P"):
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode == "P":
+                img = img.convert("RGBA")
+            if img.mode == "RGBA":
+                background.paste(img, mask=img.split()[-1])
+            else:
+                background.paste(img)
+            img = background
+        else:
+            img = img.convert("RGB")
+
+    # Resize to max 1024px while maintaining aspect ratio
+    max_size = 1024
+    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+
+    # Enhance contrast to improve text visibility, especially on dark backgrounds
+    # This helps the VLM distinguish text from background more reliably
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(1.3)  # Increase contrast by 30%
+    
+    # Slightly enhance sharpness to make text edges clearer
+    enhancer = ImageEnhance.Sharpness(img)
+    img = enhancer.enhance(1.2)  # Increase sharpness by 20%
+
+    # Keep RGB - do NOT convert to grayscale
+    # Color information helps VLM detect text regions more accurately
+    output = io.BytesIO()
+    img.save(output, format="JPEG", quality=95)  # Higher quality for better detection
+    return output.getvalue()
+
+
 
 
 async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
@@ -157,11 +202,14 @@ async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
 
     Uses a vision-language model to detect text regions and extract
     their content with bounding box coordinates.
+    
+    NOTE: Keeps image in RGB color space for detection — color contrast
+    helps the model distinguish text from background, improving recall.
     """
     logger.info("Starting label extraction from image")
 
-    # Scale image for processing
-    scaled_image = await prepare_image_for_ocr(binary_image)
+    # Prepare image for detection (keep RGB for color contrast)
+    scaled_image = await _prepare_image_for_detection(binary_image)
 
     # Use model from settings
     labeler = get_chat_agent(

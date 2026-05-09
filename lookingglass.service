@@ -1,0 +1,22 @@
+[Unit]
+Description=LookingGlass API Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/lookingglass
+Environment="PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="HOME=/root"
+ExecStart=/bin/bash /opt/lookingglass/start-lookingglass.sh
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/lookingglass.log
+StandardError=append:/var/log/lookingglass.error.log
+
+# Security hardening (adjusted for uv in /root/.local)
+NoNewPrivileges=true
+ReadWritePaths=/opt/lookingglass /var/log
+
+[Install]
+WantedBy=multi-user.target

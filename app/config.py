@@ -37,39 +37,65 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     label_prompt: str = """  # Label detection prompt template string
     You are a text region detection agent for machine translation workflows.
     
-    **Task:** Identify and localize all text regions in the input image.
+    **Task:** Identify and localize ALL text regions in the input image.
     
-    **Input:** A single image containing text (e.g., speech bubbles, paragraphs, captions, signs).
+    **Input:** A single image containing text (e.g., speech bubbles, paragraphs, captions, signs, vertical Japanese/Chinese/Korean text).
+    
+    **CRITICAL RULES:**
+    1. Do not miss ANY text regions — missing text is a CRITICAL ERROR
+    2. ALWAYS detect text at image edges (left edge, right edge, top, bottom)
+    3. For vertical text columns: each column is ONE region, do NOT split vertically
+    4. Missing text is worse than false positives — bias toward over-detection
     
     **Output Requirements:**
-    - Return a list of bounding boxes, one for each distinct text region
+    - Return a COMPLETE list of bounding boxes, one for each distinct text region
     - Each bounding box must use normalized coordinates in the format:
       - x1, y1: top-left corner coordinates
-      - x2, y2: bottom-right corner coordinates
-      - All coordinates are normalized to a 0-1000 scale 
+      - x2, y2: bottom-right corner coordinates  
+      - All coordinates are normalized to a 0-1000 scale
+    - Output ALL detected regions — do not truncate or skip any
     
     **Detection Guidelines:**
     - Detect ALL visible text in the image, including:
-      - Speech bubbles and dialogue text
+      - Speech bubbles and dialogue text (main AND small/secondary bubbles)
       - Paragraphs and continuous text blocks
-      - Signs, labels, and captions
+      - Vertical text columns (Japanese/Chinese/Korean) — each column is ONE box
+      - Signs, labels, and captions (including small footnotes)
       - Overlaid text and watermarks
-    - Each text region should have its own separate bounding box
+      - Background text (posters, screens, books within the image)
+      - Handwritten text and stylized fonts
+      - Text at image edges and corners (ESPECIALLY leftmost and rightmost edges)
+      - Small text (even 8-10px height)
+    - For vertical text: create ONE bounding box per column (top to bottom)
+    - For horizontal text: create ONE bounding box per paragraph/line group
     - Bounding boxes should tightly fit around the text with minimal padding
     - Group text that logically belongs together (e.g., text within the same speech bubble)
     - Do not overlap bounding boxes unless text regions actually overlap in the image
+    - When in doubt, include the region — completeness is the priority
+    
+    **Common Mistakes to AVOID:**
+    - ❌ Missing the leftmost text column (ALWAYS check the left edge)
+    - ❌ Missing the rightmost text column (ALWAYS check the right edge)
+    - ❌ Splitting one vertical column into multiple boxes (keep it as ONE box)
+    - ❌ Skipping small text or text at edges
+    
+    **Output Format:**
+    - Return a JSON array of label objects
+    - Each label: {"x1": float, "y1": float, "x2": float, "y2": float, "text": "extracted text"}
+    - Ensure the array is complete before responding
+    - Scan the ENTIRE image from left to right, edge to edge
     """  # End of label prompt template
 
     # Model settings (defaults – can be overridden by env vars)
     qwen3_instruct_sampler: ModelSettings = (
         ModelSettings(  # Qwen3 instruction model sampler configuration
-            temperature=0.7,  # Model temperature setting
+            temperature=0.2,  # Very low temperature for highly deterministic detection
             extra_body={  # Additional model parameters
-                "top_p": 0.8,  # Nucleus sampling parameter
+                "top_p": 0.98,  # Very high top_p to catch all edge cases
                 "top_k": 20,  # Top-k sampling parameter
                 "repetition_penalty": 1.0,  # Repetition penalty
-                "presence_penalty": 1.5,  # Presence penalty
-                "max_tokens": 16384,  # Maximum tokens to generate
+                "presence_penalty": 2.0,  # Higher presence penalty to encourage detecting more regions
+                "max_tokens": 32768,  # Increased max tokens to ensure complete output
             },
         )  # End of ModelSettings for instruct sampler
     )
@@ -122,35 +148,19 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     """
 
     # Batch translation prompt template (for multiple texts at once using JSON)
-    batch_translate_prompt_template: str = """  # Batch translation prompt template string
-    You are a professional translator specializing in accurate and natural translations.
-    
-    **Task:** Translate all texts in the JSON array into {language}.
-    
-    **Input Format:**
-    - JSON array of objects with "id" and "text" fields
-    - Example: `[{{"id": 0, "text": "Hello"}}, {{"id": 1, "text": "World"}}]`
-    
-    **Output Requirements:**
-    - Return a JSON array with the SAME structure
-    - Each object must have "id" (unchanged) and "translated_text" fields
-    - Example: `[{{"id": 0, "translated_text": "Bonjour"}}, {{"id": 1, "translated_text": "Monde"}}]`
-    
-    **Translation Rules:**
-    - Preserve the original meaning, tone, and intent for each item
-    - Ensure translations sound natural and fluent
-    - Maintain formatting, punctuation, or special characters where appropriate
-    - If any text is already in {language}, return it exactly as provided
-    - Match the input array length exactly (same number of items)
-    - Keep the same order and IDs as the input
-    
-    **Important:**
-    - Output must be VALID JSON only (no markdown, no explanations)
-    - Use double quotes for all strings
-    - Escape special characters properly in JSON
-    
-    Now translate the following texts into {language}:
-    """
+    batch_translate_prompt_template: str = """Translate these texts into {language}.
+
+Input: JSON array with "id" and "text" fields
+Output: JSON array with "id" and "translated_text" fields
+
+Rules:
+- Return ONLY valid JSON (no markdown, no explanations)
+- Preserve meaning, tone, formatting, and special characters
+- Keep proper nouns/technical terms unless standard equivalents exist
+- Maintain exact array length and order
+
+Input: {{input}}
+Output:"""
 
     # Default translation language
     default_translate_language: str = Field(
