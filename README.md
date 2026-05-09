@@ -36,11 +36,13 @@ An intelligent image annotation service that performs OCR (Optical Character Rec
    ```
 
 5. Install the browser extension:
-   - Copy `./image_annotator_content_script.js` to Violentmonkey/Greasemonkey
-   - Adjust URL in the script if server is on another machine
+   - Install [Tampermonkey](https://www.tampermonkey.net/) for your browser
+   - Install the [Image Annotator script](./image-annotator-firefox-extension/image-annotator-tampermonkey.user.js)
+   - Configure backend endpoint and access code via the script settings
 
 6. Start using:
-   - Right-click on any image to use the annotation and translation feature
+   - Right-click on any image to annotate it with AI
+   - Select text to translate it to your preferred language
 
 ## 🐳 Docker Deployment
 
