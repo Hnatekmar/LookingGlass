@@ -1,0 +1,16 @@
+{
+  "name": "image-annotator-tampermonkey",
+  "version": "2.0.0",
+  "description": "Annotate images using AI - Tampermonkey script",
+  "author": "LookingGlass",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  }
+}

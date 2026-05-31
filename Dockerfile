@@ -13,10 +13,16 @@ COPY pyproject.toml ./
 
 # Install Python dependencies
 
-# Install curl and uv package manager
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies for OpenCV and glmocr layout detector
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  curl \
+  libgl1 \
+  libglib2.0-0 \
+  libsm6 \
+  libxext6 \
+  libxrender-dev && \
+  curl -LsSf https://astral.sh/uv/install.sh | sh && \
+  rm -rf /var/lib/apt/lists/*
 
 # Add uv to PATH
 ENV PATH="/root/.local/bin:$PATH"
@@ -31,4 +37,4 @@ COPY . .
 EXPOSE 8000
 
 # Default command to run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "python3", "main.py"]

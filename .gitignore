@@ -1,19 +1,52 @@
-# Python artefacts
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
 
-# Environment variables
+# Environment files (never commit secrets)
 .env
+.env.local
+.env.*.local
 
-# uv lock (optional)
-*.lock
-
-# VSCode
+# IDE
+.idea/
 .vscode/
+*.swp
+*.swo
+*~
 
+# OS
+.DS_Store
+Thumbs.db
 
-# Temporary files
-.tmp/
+# Node.js
+node_modules/
 dist/
+
+# Tampermonkey extension
+tampermonkey-extension/node_modules/
+tampermonkey-extension/dist/
+*.user.js
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build artifacts
+*.egg-info/
+.eggs/
+build/
+
+# Logs
+*.log
+
+# Docker
+.docker/
