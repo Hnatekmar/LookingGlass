@@ -1,235 +1,147 @@
+"""
+Image processing for Looking Glass.
+
+Uses GLM-OCR for text detection with caching support.
+"""
+
 import io
 import hashlib
-import time
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
+from typing import Optional
 
-from PIL import Image
-from pydantic_ai import BinaryContent
+from PIL import Image, ImageEnhance
 
 from app.common import logger
 from app.config import get_settings
-from app.container import get_chat_agent
 from app.schema import Label, AnnotationResponse
+from app.cache import image_annotation_cache, translation_cache, CacheStats
+from app.glm_ocr_client import GLMOCRService
 
 
-# Load immutable settings once for this module
-settings = get_settings()
-
-# In-memory cache for image annotations
-# Structure: {cache_key: {"response": AnnotationResponse, "timestamp": float}}
-_image_annotation_cache: Dict[str, Dict[str, Any]] = {}
-_cache_ttl_seconds = 3600  # 1 hour default TTL
-_max_cache_size = 1000  # Maximum number of cached items
+# Cache statistics accessor (for API endpoints)
+_cache_stats = image_annotation_cache.stats
 
 
-@dataclass
-class CacheStats:
-    """Cache statistics."""
-    hits: int = 0
-    misses: int = 0
-    evictions: int = 0
+# GLM-OCR service instance (lazy-initialized)
+_glm_ocr_service: Optional[GLMOCRService] = None
+
+
+def _get_glm_ocr_service() -> GLMOCRService:
+    """Get or create GLMOCRService singleton."""
+    global _glm_ocr_service
     
-    @property
-    def hit_rate(self) -> float:
-        total = self.hits + self.misses
-        return self.hits / total if total > 0 else 0.0
-
-
-_cache_stats = CacheStats()
+    if _glm_ocr_service is None:
+        _glm_ocr_service = GLMOCRService()
+    
+    return _glm_ocr_service
 
 
 def get_image_hash(binary_image: bytes) -> str:
-    """Generate a SHA256 hash of the image content.
-    
-    Args:
-        binary_image: Raw image bytes
-        
-    Returns:
-        Hexadecimal hash string
-    """
+    """Generate a SHA256 hash of the image content."""
     return hashlib.sha256(binary_image).hexdigest()
 
 
-def _clean_cache():
-    """Remove expired entries from the cache."""
-    current_time = time.time()
-    expired_keys = [
-        key for key, value in _image_annotation_cache.items()
-        if current_time - value["timestamp"] > _cache_ttl_seconds
-    ]
-    for key in expired_keys:
-        del _image_annotation_cache[key]
-        _cache_stats.evictions += 1
+async def prepare_image_for_glm_ocr(image_bytes: bytes) -> bytes:
+    """
+    Prepare image for GLM-OCR processing.
     
-    # Also enforce max size
-    if len(_image_annotation_cache) > _max_cache_size:
-        # Remove oldest entries
-        sorted_keys = sorted(
-            _image_annotation_cache.keys(),
-            key=lambda k: _image_annotation_cache[k]["timestamp"]
-        )
-        keys_to_remove = sorted_keys[:len(_image_annotation_cache) - _max_cache_size]
-        for key in keys_to_remove:
-            del _image_annotation_cache[key]
-            _cache_stats.evictions += 1
+    - Resize to 1280px max (optimal for GLM-OCR)
+    - Maintain RGB color
+    - Apply mild sharpness enhancement
+    """
+    img = Image.open(io.BytesIO(image_bytes))
+    
+    # Convert to RGB if necessary
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    
+    # Resize to GLM-OCR optimal size
+    img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+    
+    # Mild sharpness enhancement for text edges
+    img = ImageEnhance.Sharpness(img).enhance(1.15)
+    
+    output = io.BytesIO()
+    img.save(output, format="JPEG", quality=95, optimize=True)
+    
+    logger.info(f"Image prepared for GLM-OCR: {img.size}")
+    return output.getvalue()
 
 
 async def extract_labels_with_cache(
     binary_image: bytes,
     image_hash: str,
-    cache_key: str
+    cache_key: str,
+    **kwargs,  # Ignored - kept for backward compatibility
 ) -> AnnotationResponse:
-    """Extract labels from image with caching support.
+    """
+    Extract labels from image with caching support.
     
     Args:
         binary_image: Raw image bytes
         image_hash: Pre-computed image hash
         cache_key: Cache key for lookup
+        kwargs: Ignored (kept for backward compatibility with tiling params)
         
     Returns:
         AnnotationResponse with extracted labels
     """
-    global _cache_stats
-    
-    # Clean expired entries periodically
-    if len(_image_annotation_cache) % 100 == 0:
-        _clean_cache()
-    
     # Check cache
-    if cache_key in _image_annotation_cache:
-        cached = _image_annotation_cache[cache_key]
-        if time.time() - cached["timestamp"] <= _cache_ttl_seconds:
-            _cache_stats.hits += 1
-            logger.info(f"Cache hit for image annotation (hash: {image_hash[:16]}...)")
-            return cached["response"]
+    cached = image_annotation_cache.get(cache_key)
+    if cached is not None:
+        logger.info(f"Cache hit for image annotation (hash: {image_hash[:16]}...)")
+        return cached
     
     # Cache miss - process image
-    _cache_stats.misses += 1
     logger.info(f"Cache miss for image annotation (hash: {image_hash[:16]}...)")
     
     response = await _extract_labels_from_image(binary_image)
     
     # Store in cache
-    _image_annotation_cache[cache_key] = {
-        "response": response,
-        "timestamp": time.time()
-    }
+    image_annotation_cache.set(cache_key, response)
     
     return response
 
 
-async def prepare_image_for_ocr(upload_file: bytes) -> bytes:
-    """Prepare image for OCR processing.
-
-    Converts to RGB, resizes to max 1024px, converts to grayscale,
-    and saves as JPEG for optimal OCR performance.
-    """
-    image_data = io.BytesIO(upload_file)
-    img = Image.open(image_data)
-
-    if img.mode != "RGB":
-        if img.mode in ("RGBA", "LA", "P"):
-            background = Image.new("RGB", img.size, (255, 255, 255))
-            if img.mode == "P":
-                img = img.convert("RGBA")
-            if img.mode == "RGBA":
-                background.paste(img, mask=img.split()[-1])
-            else:
-                background.paste(img)
-            img = background
-        else:
-            img = img.convert("RGB")
-
-    max_size = 1024
-    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-    img = img.convert("L")
-
-    output = io.BytesIO()
-    img.save(output, format="JPEG", quality=90)
-    return output.getvalue()
-
-
-async def _prepare_image_for_detection(upload_file: bytes) -> bytes:
-    """Prepare image for text detection (VLM-based).
-
-    Converts to RGB, resizes to max 1024px, and enhances contrast.
-    Keeps COLOR information and improves text visibility on dark backgrounds.
-    """
-    from PIL import ImageEnhance
-    
-    image_data = io.BytesIO(upload_file)
-    img = Image.open(image_data)
-
-    # Convert to RGB if necessary (handles RGBA, grayscale, palette modes)
-    if img.mode != "RGB":
-        if img.mode in ("RGBA", "LA", "P"):
-            background = Image.new("RGB", img.size, (255, 255, 255))
-            if img.mode == "P":
-                img = img.convert("RGBA")
-            if img.mode == "RGBA":
-                background.paste(img, mask=img.split()[-1])
-            else:
-                background.paste(img)
-            img = background
-        else:
-            img = img.convert("RGB")
-
-    # Resize to max 1024px while maintaining aspect ratio
-    max_size = 1024
-    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-
-    # Enhance contrast to improve text visibility, especially on dark backgrounds
-    # This helps the VLM distinguish text from background more reliably
-    enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(1.3)  # Increase contrast by 30%
-    
-    # Slightly enhance sharpness to make text edges clearer
-    enhancer = ImageEnhance.Sharpness(img)
-    img = enhancer.enhance(1.2)  # Increase sharpness by 20%
-
-    # Keep RGB - do NOT convert to grayscale
-    # Color information helps VLM detect text regions more accurately
-    output = io.BytesIO()
-    img.save(output, format="JPEG", quality=95)  # Higher quality for better detection
-    return output.getvalue()
-
-
-
-
 async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
-    """Extract text labels from an image using a labeler agent.
-
-    Uses a vision-language model to detect text regions and extract
-    their content with bounding box coordinates.
-    
-    NOTE: Keeps image in RGB color space for detection — color contrast
-    helps the model distinguish text from background, improving recall.
     """
-    logger.info("Starting label extraction from image")
-
-    # Prepare image for detection (keep RGB for color contrast)
-    scaled_image = await _prepare_image_for_detection(binary_image)
-
-    # Use model from settings
-    labeler = get_chat_agent(
-        model=settings.image_model,
-        prompt=settings.label_prompt,
-        output_type=list[Label],
-    )
-
-    # Extract labels
-    labels = await labeler.run(
-        [BinaryContent(data=scaled_image, media_type="image/jpeg")]
-    )
-
-    result: list[Label] = labels.output
-
-    # Normalize coordinates to 0-1 range
-    for e in result:
-        e.x1 /= 999.0
-        e.x2 /= 999.0
-        e.y1 /= 999.0
-        e.y2 /= 999.0
-
-    return AnnotationResponse(labels=result)
+    Extract text labels from an image using GLM-OCR.
+    """
+    settings = get_settings()
+    
+    if settings.enable_glm_ocr:
+        logger.info("Using GLM-OCR for text detection")
+        glm_ocr_service = _get_glm_ocr_service()
+        return await glm_ocr_service.extract_text_with_bboxes(binary_image)
+    else:
+        # Fallback to VLM-based detection (simplified, no tiling)
+        logger.info("Using VLM fallback for text detection")
+        from app.container import get_chat_agent
+        from pydantic_ai import BinaryContent
+        
+        # Prepare image for VLM
+        img = Image.open(io.BytesIO(binary_image))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+        img = ImageEnhance.Contrast(img).enhance(1.3)
+        
+        output = io.BytesIO()
+        img.save(output, format="JPEG", quality=95)
+        
+        labeler = get_chat_agent(
+            model=settings.image_model,
+            prompt=settings.label_prompt,
+            output_type=list[Label],
+        )
+        
+        result = await labeler.run([BinaryContent(data=output.getvalue(), media_type="image/jpeg")])
+        labels = result.output
+        
+        # Normalize coordinates to 0-1 range
+        for label in labels:
+            label.x1 /= 999.0
+            label.x2 /= 999.0
+            label.y1 /= 999.0
+            label.y2 /= 999.0
+        
+        return AnnotationResponse(labels=labels)

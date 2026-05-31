@@ -9,6 +9,7 @@ Central configuration entry point.
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import (
     Field,
@@ -18,7 +19,6 @@ from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
 )  # Import BaseSettings from pydantic-settings package
-from pydantic_ai import ModelSettings  # Import ModelSettings for AI model configuration
 
 # Determine the project root directory (parent of app/)
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -86,32 +86,39 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     - Scan the ENTIRE image from left to right, edge to edge
     """  # End of label prompt template
 
-    # Model settings (defaults – can be overridden by env vars)
-    qwen3_instruct_sampler: ModelSettings = (
-        ModelSettings(  # Qwen3 instruction model sampler configuration
-            temperature=0.2,  # Very low temperature for highly deterministic detection
-            extra_body={  # Additional model parameters
-                "top_p": 0.98,  # Very high top_p to catch all edge cases
-                "top_k": 20,  # Top-k sampling parameter
-                "repetition_penalty": 1.0,  # Repetition penalty
-                "presence_penalty": 2.0,  # Higher presence penalty to encourage detecting more regions
-                "max_tokens": 32768,  # Increased max tokens to ensure complete output
-            },
-        )  # End of ModelSettings for instruct sampler
-    )
-
-    qwen3_thinking_sampler: ModelSettings = (
-        ModelSettings(  # Qwen3 thinking model sampler configuration
-            temperature=1.0,  # Model temperature setting
-            extra_body={  # Additional model parameters
-                "top_p": 0.95,  # Nucleus sampling parameter
-                "top_k": 20,  # Top-k sampling parameter
-                "presence_penalty": 0.0,  # Presence penalty
-                "repetition_penalty": 1.0,  # Repetition penalty
-                "max_tokens": 40960,  # Maximum tokens to generate
-            },
-        )
-    )  # End of ModelSettings for thinking sampler
+    # GLM-OCR optimized prompt - leverages GLM-OCR's native OCR capabilities
+    glm_ocr_prompt: str = """You are an expert OCR (Optical Character Recognition) system.
+    
+    **Task:** Detect ALL text regions in the image and extract the text content.
+    
+    **CRITICAL REQUIREMENTS:**
+    1. Detect EVERY text region - completeness is the highest priority
+    2. Extract text accurately, preserving original formatting
+    3. Handle multiple languages (Japanese, Chinese, Korean, English, etc.)
+    4. Process vertical and horizontal text correctly
+    
+    **Detection Scope:**
+    - Speech bubbles, dialogue, captions
+    - Vertical text columns (keep each column as ONE region)
+    - Signs, labels, buttons, UI elements
+    - Background text, posters, screens
+    - Handwritten and stylized text
+    - Text at ALL edges (left, right, top, bottom)
+    - Small text (minimum 8px height)
+    
+    **Output Format:**
+    - JSON array of objects with: x1, y1, x2, y2 (normalized 0-1000), text
+    - Coordinates: x1,y1 = top-left, x2,y2 = bottom-right
+    - Include ALL detected text regions
+    - Do not miss any text - false positives are acceptable
+    
+    **Special Handling:**
+    - Vertical text: ONE box per column, top to bottom
+    - Curved text: Use tight bounding box
+    - Faded/low-contrast text: Still detect and extract
+    - Partially occluded text: Detect visible portions
+    
+    Scan systematically: left→right, top→bottom. Verify all edges before responding."""
 
     # API endpoints
     image_model_url: str = Field(
@@ -130,64 +137,42 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     )  # Canvas height for image processing
 
     # Translation prompt template (for individual text)
-    translate_prompt_template: str = """  # Translation prompt template string
-    You are a professional translator specializing in accurate and natural translations.
-    
-    **Task:** Translate the given text into {language}.
-    
-    **Requirements:**
-    - Provide ONLY the translated text without any explanations or additional commentary
-    - Preserve the original meaning, tone, and intent
-    - Ensure the translation sounds natural and fluent to native speakers
-    - Maintain any formatting, punctuation, or special characters where appropriate
-    - If the text is already in {language}, return it exactly as provided
-    - For proper nouns (names, places, brands), use standard transliterations if applicable
-    
-    **Input:** Text to be translated
-    **Output:** Translated text only
-    """
+    translate_prompt_template: str = """You are a translator. Translate the following text into natural, idiomatic {language}.
+
+**Your approach:**
+- Make it sound like a native speaker wrote it—natural, not literal
+- Match the tone: casual stays casual, formal stays formal
+- Keep contractions, slang, and personality where they fit
+- Preserve all formatting, punctuation, emojis, and special characters
+- Proper nouns stay as-is (unless there's a well-known English version)
+
+**Output:** Only the translation. No notes, no explanations.
+
+If it's already in {language}, just return it unchanged."""
 
     # Batch translation prompt template (for multiple texts at once using JSON)
-    batch_translate_prompt_template: str = """Translate these texts into {language}.
+    # Note: Output format is handled by Pydantic structured output - this prompt focuses on translation quality
+    # Input: JSON array of strings ["text1", "text2", ...]
+    # Output: List of TranslatedLabel objects with translated_text field
+    batch_translate_prompt_template: str = """You are a translator. Translate each text string into natural, idiomatic {language}.
 
-Input: JSON array with "id" and "text" fields
-Output: JSON array with "id" and "translated_text" fields
+**Input:** A JSON array of text strings from an image (speech bubbles, signs, captions, etc.).
 
-Rules:
-- Return ONLY valid JSON (no markdown, no explanations)
-- Preserve meaning, tone, formatting, and special characters
-- Keep proper nouns/technical terms unless standard equivalents exist
-- Maintain exact array length and order
+**Your approach:**
+- Make each translation sound natural and native—not literal or robotic
+- Match the original tone (casual, formal, dramatic, playful, etc.)
+- Preserve formatting, punctuation, emojis, and special characters
+- Keep proper nouns as-is (unless there's a common localized version)
+- Maintain the order: translate string 1, then 2, then 3, etc.
 
-Input: {{input}}
-Output:"""
+**Output:** Return one translation per input string, in the same order.
+If a string is already in {language}, return it unchanged.
+
+Input: {{input}}"""
 
     # Default translation language
     default_translate_language: str = Field(
         "english", alias="DEFAULT_TRANSLATE_LANGUAGE"
-    )
-
-    # Optional sampler overrides (can be supplied via env vars as JSON strings)
-    image_model_samplers: ModelSettings | None = ModelSettings(
-        temperature=0.7,
-        max_tokens=32768,
-        top_p=0.8,
-        presence_penalty=1.5,
-        extra_body={
-            "top_k": 20,
-            "chat_template_kwargs": {"enable_thinking": False},
-        },
-    )
-
-    translation_model_samplers: ModelSettings | None = ModelSettings(
-        temperature=0.7,
-        max_tokens=32768,
-        top_p=0.8,
-        presence_penalty=1.5,
-        extra_body={
-            "top_k": 20,
-            "chat_template_kwargs": {"enable_thinking": False},
-        },
     )
 
     # Optional generic LLM base URL (fallback for models not explicitly configured)
@@ -195,39 +180,35 @@ Output:"""
         None  # Generic LLM base URL (optional, falls back to specific model URLs)
     )
 
-    # OAuth2 Configuration
-    # OpenID Connect Discovery (preferred) - provide only issuer URL
-    oauth2_issuer: str | None = Field(None, alias="OAUTH2_ISSUER")
-
-    # Manual configuration (fallback) - explicit endpoints
-    oauth2_authorize_url: str | None = Field(None, alias="OAUTH2_AUTHORIZE_URL")
-    oauth2_token_url: str | None = Field(None, alias="OAUTH2_TOKEN_URL")
-    oauth2_jwks_url: str | None = Field(None, alias="OAUTH2_JWKS_URL")
-
-    # Common OAuth2 settings (optional - only required when OAuth2 is enabled)
-    oauth2_client_id: str | None = Field(None, alias="OAUTH2_CLIENT_ID")
-    oauth2_client_secret: str | None = Field(None, alias="OAUTH2_CLIENT_SECRET")
-    oauth2_redirect_uri: str | None = Field(None, alias="OAUTH2_REDIRECT_URI")
-    oauth2_scopes: str = Field("openid profile email", alias="OAUTH2_SCOPES")
-    # Session secret key for cookie-based session management (required for OAuth2 state)
-    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
-    # WARNING: Using a default development key - DO NOT use in production!
-    session_secret_key: str = Field(
-
-        "dev-secret-key-change-in-production", alias="SESSION_SECRET_KEY"
-
-    )
-
     # Redis Configuration
-    # Redis URL for persistent access code storage (optional, falls back to in-memory)
+    # Redis URL for caching (optional)
     # Format: redis://host:port/db or rediss://host:port/db for TLS
     # Example: redis://localhost:6379/0 or redis://user:pass@redis.example.com:6379/0
     redis_url: str | None = Field(None, alias="REDIS_URL")
 
-    # Access code TTL in seconds (default: 24 hours = 86400)
-    # How long access codes remain valid before expiring
-    access_code_ttl: int = Field(86400, alias="ACCESS_CODE_TTL")
+    # GLM-OCR Specific Configuration (Official SDK)
+    # Enable GLM-OCR mode (uses official GLM-OCR SDK pipeline)
+    enable_glm_ocr: bool = Field(False, alias="ENABLE_GLM_OCR")
+    # GLM-OCR request timeout (seconds)
+    glm_ocr_timeout: int = Field(60, alias="GLM_OCR_TIMEOUT")
+    # Translation model timeout (seconds) - higher for thinking mode
+    translation_timeout: int = Field(600, alias="TRANSLATION_TIMEOUT")
+    # GLM-OCR HTTP connection pool size
+    glm_ocr_pool_size: int = Field(10, alias="GLM_OCR_POOL_SIZE")
+    # GLM-OCR max tokens in response
+    glm_ocr_max_tokens: int = Field(4096, alias="GLM_OCR_MAX_TOKENS")
 
+    @property
+    def glm_ocr_host(self) -> str:
+        """Extract GLM-OCR host from IMAGE_MODEL_URL."""
+        parsed = urlparse(self.image_model_url)
+        return parsed.hostname or "localhost"
+
+    @property
+    def glm_ocr_port(self) -> int:
+        """Extract GLM-OCR port from IMAGE_MODEL_URL."""
+        parsed = urlparse(self.image_model_url)
+        return parsed.port or 8000
 
     # Make Settings immutable – aligns with 12‑factor & code‑quality immutability
     model_config = SettingsConfigDict(
@@ -236,6 +217,7 @@ Output:"""
         env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
     )
+
 
 # Instantiate a singleton Settings object at import time (process start)
 settings = Settings()  # Create singleton Settings instance
