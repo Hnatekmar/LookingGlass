@@ -11,8 +11,6 @@ from app.v1 import image, translate
 
 logger = logging.getLogger(__name__)
 
-settings = get_settings()
-
 # Configure CORS for Chrome extension and development
 # Note: redirect_slashes=False prevents 307 redirects that break CORS preflight
 app = FastAPI(redirect_slashes=False)
