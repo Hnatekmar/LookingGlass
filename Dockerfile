@@ -27,11 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Add uv to PATH
 ENV PATH="/root/.local/bin:$PATH"
 
-# uv sync 
-RUN uv sync
-
 # Copy the rest of the application code
 COPY . .
+
+# Install project with uv (no dev dependencies for production)
+RUN uv sync --no-dev
 
 # Expose the default FastAPI port
 EXPOSE 8000
