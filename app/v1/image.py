@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/image", tags=["image"])
 
+# Maximum upload size: 20 MB
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024
+
 
 @router.get("/cache/stats")
 async def get_cache_stats():
@@ -76,6 +79,22 @@ async def annotate(
     logger.info("Starting image annotation")
     start_time = time.perf_counter()
     
+    # Validate upload content type
+    if data.content_type and not data.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid content type: '{data.content_type}'. Only image files are supported.",
+        )
+
+    binary_image = await data.read()
+
+    # Validate upload size
+    if len(binary_image) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {len(binary_image)} bytes. Maximum allowed size is {MAX_UPLOAD_SIZE} bytes.",
+        )
+
     if translate_language not in SUPPORTED_LANGUAGES:
         raise HTTPException(
             status_code=400,
@@ -83,8 +102,6 @@ async def annotate(
                    f"Supported: {', '.join(sorted(SUPPORTED_LANGUAGES - {'none'}))}"
         )
 
-    binary_image = await data.read()
-    
     # Generate cache key
     image_hash = get_image_hash(binary_image)
     cache_key = f"image:{image_hash}"
