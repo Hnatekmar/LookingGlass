@@ -16,4 +16,4 @@ An intelligent image annotation service that performs OCR (Optical Character Rec
 3. uv run fastapi run main.py
 4. Change translation model [common.py](app/common.py) you will also want to 
 5. Copy ./image_annotator_content_scrip.js to https://violentmonkey.github.io/ (if server is running in another machine change the url in the script)
-5. Right click on any image and script should label it and translate it to english.# Test ALGOVECTRA_TOKEN
+5. Right click on any image and script should label it and translate it to english.
