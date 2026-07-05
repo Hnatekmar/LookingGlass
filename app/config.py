@@ -219,14 +219,19 @@ Input: {{input}}"""
     )
 
 
-# Instantiate a singleton Settings object at import time (process start)
-settings = Settings()  # Create singleton Settings instance
+# Lazy singleton: instantiated on first call to get_settings()
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:  # Function definition with return type hint
-    """Return the shared immutable Settings instance.
+    """Return the shared immutable Settings instance (lazily created).
 
     This function is the canonical way to retrieve configuration throughout the
     codebase, enabling explicit dependency injection and easier testing.
+    The Settings object is created on first access, so tests can set
+    environment variables before any code calls ``get_settings()``.
     """
-    return settings  # Return the singleton settings instance
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings

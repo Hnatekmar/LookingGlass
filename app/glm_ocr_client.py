@@ -13,7 +13,6 @@ Usage:
 import asyncio
 from typing import List, Dict, Any
 
-from glmocr import GlmOcr
 from app.schema import Label, AnnotationResponse
 from app.config import get_settings
 from app.common import logger
@@ -30,6 +29,7 @@ class GLMOCRService:
     """
     
     def __init__(self):
+        from glmocr import GlmOcr  # lazy import — glmocr may not be installed
         settings = get_settings()
         self._parser = GlmOcr(
             mode="selfhosted",
