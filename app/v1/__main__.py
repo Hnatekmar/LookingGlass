@@ -1,6 +1,7 @@
 """FastAPI application with version 1 API routes."""
 
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,18 +12,44 @@ from app.v1 import image, translate
 
 logger = logging.getLogger(__name__)
 
-# Configure CORS for Chrome extension and development
+# Configure CORS for the browser extension and development
 # Note: redirect_slashes=False prevents 307 redirects that break CORS preflight
+# Security: In production, restrict allow_origins to the actual extension origin
+# instead of "*" when allow_credentials=True.
 app = FastAPI(redirect_slashes=False)
+
+# For production deployments, set CORS_ORIGINS env var to a comma-separated
+# list of allowed origins. Falls back to "*" for development convenience.
+_cors_origins_str = os.getenv("CORS_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins - change for production
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=(_cors_origins != ["*"]),
     allow_methods=["*"],  # Allows all HTTP methods
     allow_headers=["*"],  # Allows all headers
     expose_headers=["X-Auth-Code"],
 )
+
+# Optional API key authentication middleware
+# Set API_KEY env var to enable. Requests must include X-API-Key header.
+_API_KEY = os.getenv("API_KEY")
+
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    """Check API key on all routes except health check if API_KEY is configured."""
+    if _API_KEY and request.url.path != "/v1/health":
+        api_key = request.headers.get("X-API-Key")
+        if api_key != _API_KEY:
+            return HTMLResponse(
+                content='{"detail":"Unauthorized"}',
+                status_code=401,
+                headers={"Content-Type": "application/json"},
+            )
+    response = await call_next(request)
+    return response
 
 
 @app.get("/v1/health")
