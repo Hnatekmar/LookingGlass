@@ -1,5 +1,10 @@
-"""FastAPI application with version 1 API routes."""
+"""FastAPI application with version 1 API routes.
 
+Note: Configuration values (API_KEY, CORS_ORIGINS) are read at import time.
+Changes to environment variables require a process restart to take effect.
+"""
+
+import hmac
 import logging
 import os
 
@@ -22,6 +27,9 @@ app = FastAPI(redirect_slashes=False)
 # list of allowed origins. Falls back to "*" for development convenience.
 _cors_origins_str = os.getenv("CORS_ORIGINS", "*")
 _cors_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()]
+# If the parsed origin list is empty (e.g. misconfigured as ","), fall back to "*"
+if not _cors_origins:
+    _cors_origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,15 +42,19 @@ app.add_middleware(
 
 # Optional API key authentication middleware
 # Set API_KEY env var to enable. Requests must include X-API-Key header.
+# Note: Read once at import time; requires restart to pick up changes.
 _API_KEY = os.getenv("API_KEY")
 
 
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
-    """Check API key on all routes except health check if API_KEY is configured."""
+    """Check API key on all routes except health check if API_KEY is configured.
+
+    Uses constant-time comparison to mitigate timing attacks.
+    """
     if _API_KEY and request.url.path != "/v1/health":
         api_key = request.headers.get("X-API-Key")
-        if api_key != _API_KEY:
+        if not api_key or not hmac.compare_digest(api_key, _API_KEY):
             return HTMLResponse(
                 content='{"detail":"Unauthorized"}',
                 status_code=401,
