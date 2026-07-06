@@ -138,10 +138,11 @@ async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
         labels = result.output
         
         # Normalize coordinates to 0-1 range
+        # Label prompt specifies 0-1000 coordinate scale, so divide by 1000.0
         for label in labels:
-            label.x1 /= 999.0
-            label.x2 /= 999.0
-            label.y1 /= 999.0
-            label.y2 /= 999.0
+            label.x1 /= 1000.0
+            label.x2 /= 1000.0
+            label.y1 /= 1000.0
+            label.y2 /= 1000.0
         
         return AnnotationResponse(labels=labels)
