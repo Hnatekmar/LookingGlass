@@ -29,6 +29,12 @@ _cors_origins_str = os.getenv("CORS_ORIGINS", "*")
 _cors_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()]
 # If the parsed origin list is empty (e.g. misconfigured as ","), fall back to "*"
 if not _cors_origins:
+    if _cors_origins_str.strip() and _cors_origins_str.strip() != "*":
+        logger.warning(
+            "CORS_ORIGINS='%s' produced an empty origin list after parsing; "
+            "falling back to '*' (wide open). Check your CORS_ORIGINS configuration.",
+            _cors_origins_str,
+        )
     _cors_origins = ["*"]
 
 app.add_middleware(
