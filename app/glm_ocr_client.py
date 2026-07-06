@@ -29,7 +29,13 @@ class GLMOCRService:
     """
     
     def __init__(self):
-        from glmocr import GlmOcr  # lazy import — glmocr may not be installed
+        try:
+            from glmocr import GlmOcr
+        except ImportError:
+            raise ImportError(
+                "glmocr package is required for OCR functionality. "
+                "Install it with: pip install glmocr"
+            )
         settings = get_settings()
         self._parser = GlmOcr(
             mode="selfhosted",
@@ -69,7 +75,9 @@ class GLMOCRService:
                     if isinstance(region, dict) and "bbox_2d" in region:
                         coords = region["bbox_2d"]
                         if len(coords) == 4:
-                            # GLM-OCR returns normalized 0-1000 coordinates
+                            # GLM-OCR returns normalized 0-1000 coordinates.
+                            # Divide by 1000.0 to convert to 0-1 range,
+                            # which is what the rest of the codebase expects.
                             labels.append(Label(
                                 x1=coords[0] / 1000.0,
                                 y1=coords[1] / 1000.0,
