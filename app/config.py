@@ -35,6 +35,9 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
 
     # Prompts
     label_prompt: str = """  # Label detection prompt template string
+    # NOTE: Coordinate normalization (÷1000) assumes labels use a 0-1000 scale
+    # as specified in this prompt. If you change the prompt's coordinate scale
+    # (e.g., to 0-1), update app/image_processing.py normalization accordingly.
     You are a text region detection agent for machine translation workflows.
     
     **Task:** Identify and localize ALL text regions in the input image.
