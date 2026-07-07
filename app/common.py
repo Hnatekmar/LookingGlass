@@ -2,8 +2,8 @@ import logging
 import os
 
 # Get log level from environment variable, default to INFO
-log_level = os.getenv("LOG_LEVEL", "DEBUG").upper()
-log_level_value = getattr(logging, log_level, logging.DEBUG)
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level_value = getattr(logging, log_level, logging.INFO)
 
 # Configure basic logging - set root logger level explicitly
 logging.basicConfig(
