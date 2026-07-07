@@ -4,6 +4,7 @@ Translation utilities for Looking Glass.
 Provides batch translation with caching support.
 """
 
+import asyncio
 import json
 from typing import List
 
@@ -134,13 +135,15 @@ async def _translate_labels_individual(
     labels: List[Label],
     translate_language: str,
 ) -> List[Label]:
-    """Fallback: Translate each label individually."""
+    """Fallback: Translate each label individually, parallelized with asyncio.gather."""
     if not labels:
         return labels
-    
+
     logger.info(f"Individual translation for {len(labels)} labels")
-    
-    for label in labels:
-        label.text = await _translate_text(label.text, translate_language)
-    
+
+    tasks = [asyncio.create_task(_translate_text(label.text, translate_language)) for label in labels]
+    translated_texts = await asyncio.gather(*tasks)
+    for label, translated in zip(labels, translated_texts):
+        label.text = translated
+
     return labels
