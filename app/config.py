@@ -201,6 +201,21 @@ Input: {{input}}"""
     # GLM-OCR max tokens in response
     glm_ocr_max_tokens: int = Field(4096, alias="GLM_OCR_MAX_TOKENS")
 
+    # Gemma OCR Configuration (OpenAI-compatible API)
+    # Enable Gemma OCR mode (uses vision-language model via OpenAI-compatible API)
+    enable_gemma_ocr: bool = Field(False, alias="ENABLE_GEMMA_OCR")
+    # Gemma OCR API endpoint URL
+    # Default points to the remote Gemma 12b endpoint
+    gemma_ocr_url: str = Field(
+        "http://172.16.100.189:8010/v1", alias="GEMMA_OCR_URL"
+    )
+    # Gemma OCR model name
+    gemma_ocr_model: str = Field("gemma-12b", alias="GEMMA_OCR_MODEL")
+    # Gemma OCR request timeout (seconds)
+    gemma_ocr_timeout: int = Field(120, alias="GEMMA_OCR_TIMEOUT")
+    # Gemma OCR max tokens in response
+    gemma_ocr_max_tokens: int = Field(4096, alias="GEMMA_OCR_MAX_TOKENS")
+
     @property
     def glm_ocr_host(self) -> str:
         """Extract GLM-OCR host from IMAGE_MODEL_URL."""
