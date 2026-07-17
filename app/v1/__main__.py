@@ -98,6 +98,7 @@ async def root():
             "health": "/v1/health",
             "translate": "/v1/translate/",
             "annotate": "/v1/image/annotate/",
+            "annotate_stream": "/v1/image/annotate/stream",
         },
     }
 
