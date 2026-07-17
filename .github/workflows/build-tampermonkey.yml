@@ -1,0 +1,41 @@
+name: Build Tampermonkey Extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tampermonkey-extension/**'
+  pull_request:
+    paths:
+      - 'tampermonkey-extension/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Tampermonkey extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tampermonkey-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: tampermonkey-extension
+
+      - name: Build extension
+        run: npm run build
+        working-directory: tampermonkey-extension
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tampermonkey-extension
+          path: tampermonkey-extension/dist/image-annotator.user.js
+          retention-days: 30
