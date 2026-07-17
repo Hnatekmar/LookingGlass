@@ -5,14 +5,13 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: lookingglass-app
-    env_file:
-      - .env
     ports:
       - "8090:8090"
     depends_on:
       image-annotator:
         condition: service_healthy
     environment:
+      # GLM-OCR endpoint (image-annotator service)
       - IMAGE_MODEL_URL=http://image-annotator:8000/v1
       # Gemma 12b OCR configuration (optional, defaults to remote endpoint)
       - ENABLE_GEMMA_OCR=${ENABLE_GEMMA_OCR:-false}
