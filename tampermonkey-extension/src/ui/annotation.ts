@@ -13,7 +13,9 @@ export function updateLabelTexts(updates: Array<{ index: number; text: string }>
     if (textSpan) {
       textSpan.textContent = update.text;
       textSpan.dataset.fullText = update.text;
-      textSpan.title = update.text;
+      textSpan.setAttribute("title", update.text);
+      // Also update the label div title for broader hover area
+      labelEl.setAttribute("title", update.text);
     }
   }
 }
@@ -157,6 +159,7 @@ function createLabelElement(label: Label, index: number, imgRect: DOMRect, offse
 
   if (label.text) {
     const textSpan = createLabelText(label.text, width);
+    labelDiv.setAttribute("title", label.text); // also on label div for broader hit area
     labelDiv.appendChild(textSpan);
   }
 
@@ -173,7 +176,7 @@ function createLabelText(text: string, _labelWidth: number): HTMLSpanElement {
   textSpan.textContent = text;
   textSpan.className = "lg-label-text";
   textSpan.dataset.fullText = text;
-  textSpan.title = text; // Native browser tooltip for long text
+  textSpan.setAttribute("title", text); // Native browser tooltip for long text
   textSpan.style.cssText = `
     padding: 4px 8px;
     background: rgba(59, 130, 246, 0.9);
