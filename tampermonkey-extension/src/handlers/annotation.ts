@@ -1,7 +1,6 @@
-import { displayLabelsOnImage, removeExistingOverlay, displayLabelsProgressive } from '../ui/annotation';
+import { displayLabelsProgressive } from '../ui/annotation';
 import { annotateImageStream } from '../core/api';
 import { showNotification, showPersistentNotification, dismissPersistentNotification } from '../ui/notification';
-import type { Label } from '../types';
 
 let isAnnotating = false;
 
@@ -40,7 +39,7 @@ export function handleAnnotateImage(imageUrl: string, imgElement: HTMLImageEleme
         showNotification("No text found in image", "info");
       }
     },
-    onProgress: (progress) => {
+    onProgress: (_progress) => {
       // Progress updates — could be used for a progress bar in the future
     },
   }).catch((err) => {

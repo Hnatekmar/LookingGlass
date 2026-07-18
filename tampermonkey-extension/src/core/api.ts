@@ -55,22 +55,9 @@ export async function resizeImageBlob(blob: Blob, maxDim: number): Promise<Blob>
 }
 
 /** SSE event types for the streaming annotation endpoint */
-interface SSELabelsEvent {
-  tile: number;
-  labels: Label[];
-}
-
-interface SSETranslateUpdate {
+export interface SSETranslateUpdate {
   index: number;
   text: string;
-}
-
-interface SSETranslateEvent {
-  updates: SSETranslateUpdate[];
-}
-
-interface SSEErrorEvent {
-  detail: string;
 }
 
 type SSEEventCallback = {
