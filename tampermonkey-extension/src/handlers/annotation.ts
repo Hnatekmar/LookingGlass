@@ -1,4 +1,4 @@
-import { displayLabelsProgressive } from '../ui/annotation';
+import { displayLabelsProgressive, updateLabelTexts } from '../ui/annotation';
 import { annotateImageStream } from '../core/api';
 import { showNotification, showPersistentNotification, dismissPersistentNotification } from '../ui/notification';
 
@@ -23,6 +23,7 @@ export function handleAnnotateImage(imageUrl: string, imgElement: HTMLImageEleme
     },
     onTranslate: (updates) => {
       // Translations arrive as a batch — update the displayed text
+      updateLabelTexts(updates);
       showNotification(`Translations applied to ${updates.length} label(s)`, "info");
     },
     onError: (detail) => {

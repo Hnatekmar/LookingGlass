@@ -185,6 +185,18 @@ async def annotate_stream(
         async def _cached_stream():
             event_data = SSELabelsEventData(tile=0, labels=cached.labels)
             yield _format_sse("labels", event_data)
+            # If translation requested, translate cached labels and emit event
+            if translate and cached.labels:
+                from app.translation import translate_labels_with_cache
+                translated = await translate_labels_with_cache(
+                    cached.labels, translate_language, image_hash
+                )
+                updates = [
+                    SSETranslateUpdate(index=i, text=l.text)
+                    for i, l in enumerate(translated)
+                ]
+                if updates:
+                    yield _format_sse("translate", SSETranslateEventData(updates=updates))
             yield _format_sse("complete", SSECompleteEventData())
 
         return StreamingResponse(
@@ -217,8 +229,8 @@ async def annotate_stream(
 
         event_queue: asyncio.Queue = asyncio.Queue()
 
-        async def tile_callback(event_data: SSELabelsEventData):
-            await event_queue.put(("labels", event_data))
+        async def tile_callback(event_type: str, event_data):
+            await event_queue.put((event_type, event_data))
 
         # Start processing in background
         process_task = asyncio.create_task(
