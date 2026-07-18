@@ -1,5 +1,4 @@
 import type { Label } from '../types';
-import { showNotification } from './notification';
 
 /**
  * Update existing label text with translation results.
@@ -14,11 +13,6 @@ export function updateLabelTexts(updates: Array<{ index: number; text: string }>
     if (textSpan) {
       textSpan.textContent = update.text;
       textSpan.dataset.fullText = update.text;
-    }
-    // Also update the tooltip text
-    const tooltip = document.querySelectorAll(".lg-label-tooltip")[update.index] as HTMLElement | undefined;
-    if (tooltip) {
-      tooltip.textContent = update.text.replace(/\n/g, " ");
     }
   }
 }
@@ -112,7 +106,7 @@ function createLabelElement(label: Label, index: number, imgRect: DOMRect, offse
   const labelDiv = document.createElement("div");
   labelDiv.className = "lg-label";
   labelDiv.dataset.index = String(index);
-  
+
   const left = offsetX + label.x1 * imgRect.width;
   const top = offsetY + label.y1 * imgRect.height;
   const width = (label.x2 - label.x1) * imgRect.width;
@@ -141,22 +135,20 @@ function createLabelElement(label: Label, index: number, imgRect: DOMRect, offse
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
   `;
 
-  labelDiv.onmouseenter = function() {
-    this.style.background = "rgba(59, 130, 246, 0.2)";
-    this.style.borderColor = "#2563eb";
-    this.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.3)";
-    // Update text span background too
-    const textSpan = this.querySelector(".lg-label-text");
+  labelDiv.onmouseenter = () => {
+    labelDiv.style.background = "rgba(59, 130, 246, 0.2)";
+    labelDiv.style.borderColor = "#2563eb";
+    labelDiv.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.3)";
+    const textSpan = labelDiv.querySelector(".lg-label-text") as HTMLElement | null;
     if (textSpan) {
       textSpan.style.background = "rgba(59, 130, 246, 1)";
     }
   };
-  labelDiv.onmouseleave = function() {
-    this.style.background = "rgba(59, 130, 246, 0.1)";
-    this.style.borderColor = "#3b82f6";
-    this.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.2)";
-    // Reset text span background
-    const textSpan = this.querySelector(".lg-label-text");
+  labelDiv.onmouseleave = () => {
+    labelDiv.style.background = "rgba(59, 130, 246, 0.1)";
+    labelDiv.style.borderColor = "#3b82f6";
+    labelDiv.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.2)";
+    const textSpan = labelDiv.querySelector(".lg-label-text") as HTMLElement | null;
     if (textSpan) {
       textSpan.style.background = "rgba(59, 130, 246, 0.9)";
     }
@@ -164,29 +156,7 @@ function createLabelElement(label: Label, index: number, imgRect: DOMRect, offse
 
   if (label.text) {
     const textSpan = createLabelText(label.text, width);
-    const tooltip = createLabelTooltip(label.text, width);
-    
-    labelDiv.addEventListener("mouseenter", (e) => {
-      e.stopPropagation();
-      // Dynamically calculate tooltip position relative to overlay container
-      const labelRect = labelDiv.getBoundingClientRect();
-      const containerRect = overlay.getBoundingClientRect();
-      const relativeLeft = labelRect.left - containerRect.left + (labelRect.width / 2);
-      const relativeTop = labelRect.top - containerRect.top + (labelRect.height / 2);
-      tooltip.style.left = `${relativeLeft}px`;
-      tooltip.style.top = `${relativeTop}px`;
-      tooltip.style.transform = "translate(-50%, -50%)";
-      tooltip.style.display = "block";
-    });
-
-    labelDiv.addEventListener("mouseleave", (e) => {
-      e.stopPropagation();
-      tooltip.style.display = "none";
-    });
-
     labelDiv.appendChild(textSpan);
-    // Append tooltip to overlay, not labelDiv, for proper positioning
-    overlay.appendChild(tooltip);
   }
 
   labelDiv.addEventListener("click", (e) => {
@@ -197,7 +167,7 @@ function createLabelElement(label: Label, index: number, imgRect: DOMRect, offse
   return labelDiv;
 }
 
-function createLabelText(text: string, labelWidth: number): HTMLSpanElement {
+function createLabelText(text: string, _labelWidth: number): HTMLSpanElement {
   const textSpan = document.createElement("span");
   textSpan.textContent = text;
   textSpan.className = "lg-label-text";
@@ -217,32 +187,6 @@ function createLabelText(text: string, labelWidth: number): HTMLSpanElement {
     backdrop-filter: blur(4px);
   `;
   return textSpan;
-}
-
-function createLabelTooltip(text: string, labelWidth: number): HTMLDivElement {
-  const tooltip = document.createElement("div");
-  tooltip.className = "lg-label-tooltip";
-  tooltip.textContent = text.replace(/\n/g, " ");
-  tooltip.style.cssText = `
-    position: absolute;
-    background: rgba(255, 255, 255, 0.98);
-    color: #1f2937;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-width: ${Math.max(labelWidth, 240)}px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    pointer-events: none;
-    z-index: 2147483647;
-    display: none;
-    min-width: ${labelWidth}px;
-    text-align: center;
-    border: 1px solid #e5e7eb;
-  `;
-  return tooltip;
 }
 
 function findPositionedContainer(element: HTMLElement): HTMLElement | null {
