@@ -1,5 +1,6 @@
 import { showNotification } from './notification';
 import { translateText as apiTranslateText } from '../core/api';
+import { getSettings } from '../core/settings';
 
 let isTranslating = false;
 let translateTooltip: HTMLDivElement | null = null;
@@ -40,6 +41,10 @@ function onMouseUp(): void {
   if (target && target.closest(".lg-modal-overlay, .lg-label-container, .lg-translate-tooltip")) {
     return;
   }
+
+  // Check if auto-translate is enabled in settings
+  const settings = getSettings();
+  if (!settings.autoTranslate) return;
 
   // Debounce: wait 400ms after user stops selecting before translating
   selectionDebounce = setTimeout(() => {

@@ -36,6 +36,15 @@ export function openSettingsDialog(): void {
   const qualityGroup = createQualityModeField(settings.qualityMode || "balanced");
   content.appendChild(qualityGroup);
 
+  // Auto Translate toggle
+  const autoTranslateGroup = createToggleField(
+    "Auto-Translate Selection",
+    "Automatically translate selected text on any webpage",
+    settings.autoTranslate ?? true,
+    "autoTranslate"
+  );
+  content.appendChild(autoTranslateGroup);
+
   // Quality mode description
   const qualityDesc = document.createElement("div");
   qualityDesc.style.cssText = `
@@ -89,7 +98,8 @@ export function openSettingsDialog(): void {
             backendEndpoint: endpointValue || getDefaults().backendEndpoint,
             accessCode: (document.getElementById("accessCode") as HTMLInputElement).value,
             targetLanguage: (document.getElementById("targetLanguage") as HTMLInputElement).value || "english",
-            qualityMode: (document.getElementById("qualityMode") as HTMLSelectElement).value as 'fast' | 'balanced' | 'accurate'
+            qualityMode: (document.getElementById("qualityMode") as HTMLSelectElement).value as 'fast' | 'balanced' | 'accurate',
+            autoTranslate: (document.getElementById("autoTranslate") as HTMLInputElement).checked
           };
           saveSettings(newSettings);
           showNotification("Settings saved successfully", "success");
@@ -221,6 +231,105 @@ async function handleTestConnection(btn: HTMLButtonElement): Promise<void> {
     btn.style.borderColor = "#d1d5db";
     btn.style.color = "#374151";
   }, 3000);
+}
+
+function createToggleField(label: string, description: string, checked: boolean, id: string): HTMLDivElement {
+  const group = document.createElement("div");
+  group.style.cssText = `margin-bottom: 20px;`;
+
+  const labelRow = document.createElement("div");
+  labelRow.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  `;
+
+  const textSide = document.createElement("div");
+  textSide.style.cssText = `flex: 1;`;
+
+  const labelEl = document.createElement("div");
+  labelEl.textContent = label;
+  labelEl.style.cssText = `
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 2px;
+  `;
+
+  const descEl = document.createElement("div");
+  descEl.textContent = description;
+  descEl.style.cssText = `
+    font-size: 12px;
+    color: #6b7280;
+  `;
+
+  textSide.appendChild(labelEl);
+  textSide.appendChild(descEl);
+
+  // Toggle switch
+  const toggle = document.createElement("label");
+  toggle.style.cssText = `
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+    cursor: pointer;
+  `;
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.id = id;
+  checkbox.checked = checked;
+  checkbox.style.cssText = `
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  `;
+
+  const slider = document.createElement("span");
+  slider.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${checked ? '#3b82f6' : '#d1d5db'};
+    transition: 0.3s;
+    border-radius: 24px;
+  `;
+
+  const knob = document.createElement("span");
+  knob.style.cssText = `
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    transform: ${checked ? 'translateX(20px)' : 'translateX(0)'};
+  `;
+
+  checkbox.onchange = () => {
+    slider.style.background = checkbox.checked ? '#3b82f6' : '#d1d5db';
+    knob.style.transform = checkbox.checked ? 'translateX(20px)' : 'translateX(0)';
+  };
+
+  slider.appendChild(knob);
+  toggle.appendChild(checkbox);
+  toggle.appendChild(slider);
+
+  labelRow.appendChild(textSide);
+  labelRow.appendChild(toggle);
+  group.appendChild(labelRow);
+
+  return group;
 }
 
 function createQualityModeField(currentValue: string): HTMLDivElement {
