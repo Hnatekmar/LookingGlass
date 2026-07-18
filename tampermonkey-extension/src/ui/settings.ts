@@ -32,28 +32,14 @@ export function openSettingsDialog(): void {
   const languageGroup = createFormField("Target Language", "text", settings.targetLanguage, "Language for translations (e.g., english, spanish)", "targetLanguage");
   content.appendChild(languageGroup);
 
-  // Quality Mode dropdown
-  const qualityGroup = createQualityModeField(settings.qualityMode || "balanced");
-  content.appendChild(qualityGroup);
-
-  // Quality mode description
-  const qualityDesc = document.createElement("div");
-  qualityDesc.style.cssText = `
-    margin-top: -15px;
-    margin-bottom: 20px;
-    padding: 12px;
-    background: #f8fafc;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #64748b;
-    line-height: 1.5;
-  `;
-  qualityDesc.innerHTML = `
-    <strong>Fast:</strong> Quick processing, best for small images<br>
-    <strong>Balanced:</strong> Auto-tiles large images (recommended)<br>
-    <strong>Accurate:</strong> Always tiles for maximum text detection
-  `;
-  content.appendChild(qualityDesc);
+  // Auto Translate toggle
+  const autoTranslateGroup = createToggleField(
+    "Auto-Translate Selection",
+    "Automatically translate selected text on any webpage",
+    settings.autoTranslate ?? true,
+    "autoTranslate"
+  );
+  content.appendChild(autoTranslateGroup);
 
   // Test connection button
   const testSection = document.createElement("div");
@@ -89,7 +75,7 @@ export function openSettingsDialog(): void {
             backendEndpoint: endpointValue || getDefaults().backendEndpoint,
             accessCode: (document.getElementById("accessCode") as HTMLInputElement).value,
             targetLanguage: (document.getElementById("targetLanguage") as HTMLInputElement).value || "english",
-            qualityMode: (document.getElementById("qualityMode") as HTMLSelectElement).value as 'fast' | 'balanced' | 'accurate'
+            autoTranslate: (document.getElementById("autoTranslate") as HTMLInputElement).checked
           };
           saveSettings(newSettings);
           showNotification("Settings saved successfully", "success");
@@ -223,54 +209,102 @@ async function handleTestConnection(btn: HTMLButtonElement): Promise<void> {
   }, 3000);
 }
 
-function createQualityModeField(currentValue: string): HTMLDivElement {
+function createToggleField(label: string, description: string, checked: boolean, id: string): HTMLDivElement {
   const group = document.createElement("div");
   group.style.cssText = `margin-bottom: 20px;`;
 
-  const labelEl = document.createElement("label");
-  labelEl.textContent = "Quality Mode";
-  labelEl.setAttribute("for", "qualityMode");
+  const labelRow = document.createElement("div");
+  labelRow.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  `;
+
+  const textSide = document.createElement("div");
+  textSide.style.cssText = `flex: 1;`;
+
+  const labelEl = document.createElement("div");
+  labelEl.textContent = label;
   labelEl.style.cssText = `
-    display: block;
     font-size: 13px;
     font-weight: 600;
     color: #374151;
-    margin-bottom: 8px;
+    margin-bottom: 2px;
   `;
 
-  const select = document.createElement("select");
-  select.id = "qualityMode";
-  select.style.cssText = `
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 14px;
-    color: #111827;
-    background: #ffffff;
-    transition: all 0.2s;
-    box-sizing: border-box;
+  const descEl = document.createElement("div");
+  descEl.textContent = description;
+  descEl.style.cssText = `
+    font-size: 12px;
+    color: #6b7280;
+  `;
+
+  textSide.appendChild(labelEl);
+  textSide.appendChild(descEl);
+
+  // Toggle switch
+  const toggle = document.createElement("label");
+  toggle.style.cssText = `
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
     cursor: pointer;
   `;
-  select.onfocus = () => { select.style.borderColor = "#3b82f6"; select.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)"; };
-  select.onblur = () => { select.style.borderColor = "#d1d5db"; select.style.boxShadow = "none"; };
 
-  const options = [
-    { value: "fast", label: "Fast (Single Pass)" },
-    { value: "balanced", label: "Balanced (Adaptive Tiling)" },
-    { value: "accurate", label: "Accurate (Always Tile)" }
-  ];
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.id = id;
+  checkbox.checked = checked;
+  checkbox.style.cssText = `
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  `;
 
-  options.forEach(opt => {
-    const option = document.createElement("option");
-    option.value = opt.value;
-    option.textContent = opt.label;
-    if (opt.value === currentValue) option.selected = true;
-    select.appendChild(option);
-  });
+  const slider = document.createElement("span");
+  slider.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${checked ? '#3b82f6' : '#d1d5db'};
+    transition: 0.3s;
+    border-radius: 24px;
+  `;
 
-  group.appendChild(labelEl);
-  group.appendChild(select);
+  const knob = document.createElement("span");
+  knob.style.cssText = `
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    transform: ${checked ? 'translateX(20px)' : 'translateX(0)'};
+  `;
+
+  checkbox.onchange = () => {
+    slider.style.background = checkbox.checked ? '#3b82f6' : '#d1d5db';
+    knob.style.transform = checkbox.checked ? 'translateX(20px)' : 'translateX(0)';
+  };
+
+  slider.appendChild(knob);
+  toggle.appendChild(checkbox);
+  toggle.appendChild(slider);
+
+  labelRow.appendChild(textSide);
+  labelRow.appendChild(toggle);
+  group.appendChild(labelRow);
+
   return group;
 }
+
