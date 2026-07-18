@@ -36,6 +36,56 @@ export function displayLabelsOnImage(labels: Label[], imgElement: HTMLImageEleme
   container.appendChild(overlay);
 }
 
+/**
+ * Display labels progressively as they arrive from the streaming endpoint.
+ * On the first batch, creates a fresh overlay. Subsequent batches add to it.
+ */
+export function displayLabelsProgressive(
+  labels: Label[],
+  imgElement: HTMLImageElement,
+  isFirstBatch: boolean,
+): void {
+  if (isFirstBatch) {
+    removeExistingOverlay();
+  }
+
+  const container = findPositionedContainer(imgElement);
+  if (!container) {
+    console.error("[Image Annotator] Could not find positioned container");
+    return;
+  }
+
+  let overlay = document.querySelector(".lg-label-container") as HTMLElement | null;
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "lg-label-container";
+    overlay.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2147483647;
+    `;
+    container.style.position = container.style.position || "relative";
+    container.appendChild(overlay);
+  }
+
+  const imgRect = imgElement.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const offsetX = imgRect.left - containerRect.left;
+  const offsetY = imgRect.top - containerRect.top;
+
+  // Count existing labels to assign unique indices
+  const existingCount = overlay.querySelectorAll(".lg-label").length;
+
+  labels.forEach((label, i) => {
+    const labelDiv = createLabelElement(label, existingCount + i, imgRect, offsetX, offsetY, overlay!);
+    overlay!.appendChild(labelDiv);
+  });
+}
+
 function createLabelElement(label: Label, index: number, imgRect: DOMRect, offsetX: number, offsetY: number, overlay: HTMLElement): HTMLDivElement {
   const labelDiv = document.createElement("div");
   labelDiv.className = "lg-label";
