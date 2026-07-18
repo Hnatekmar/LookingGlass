@@ -192,6 +192,7 @@ export async function annotateImageStream(
 
       let buffer = '';
       const allLabels: Label[] = [];
+      let streamCompleted = false; // set when complete event is seen
 
       GM_xmlhttpRequest({
         method: "POST",
@@ -223,7 +224,7 @@ export async function annotateImageStream(
                 },
                 onTranslate: (updates) => callbacks.onTranslate?.(updates),
                 onError: (detail) => callbacks.onError?.(detail),
-                onComplete: () => {},
+                onComplete: () => { streamCompleted = true; },
               });
             }
           }
@@ -236,6 +237,13 @@ export async function annotateImageStream(
           }
           if (response.status >= 400) {
             reject(new Error(`Annotation failed (${response.status})`));
+            return;
+          }
+
+          // If stream was already fully processed by onprogress, skip re-parsing
+          if (streamCompleted) {
+            callbacks.onProgress?.(100);
+            resolve({ success: true, labels: allLabels });
             return;
           }
 
