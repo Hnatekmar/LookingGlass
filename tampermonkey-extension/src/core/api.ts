@@ -239,10 +239,12 @@ export async function annotateImageStream(
             return;
           }
 
-          // Parse any remaining data in the buffer
-          if (response.responseText) {
+          // If onprogress never fired, use the full response text
+          if (response.responseText && buffer.length === 0) {
             buffer = response.responseText;
           }
+          // Otherwise buffer already contains the remainder from onprogress
+          // — parse whatever wasn't consumed yet
 
           let hadComplete = false;
           parseSSEBuffer(buffer, {

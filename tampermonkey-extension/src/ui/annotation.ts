@@ -172,15 +172,14 @@ function createLabelText(text: string, _labelWidth: number): HTMLSpanElement {
   textSpan.textContent = text;
   textSpan.className = "lg-label-text";
   textSpan.dataset.fullText = text;
+  textSpan.title = text; // Native browser tooltip for long text
   textSpan.style.cssText = `
     padding: 4px 8px;
     background: rgba(59, 130, 246, 0.9);
     border-radius: 6px;
     font-size: 12px;
     max-width: calc(100% - 16px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: break-all;
     color: #ffffff;
     font-weight: 600;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
