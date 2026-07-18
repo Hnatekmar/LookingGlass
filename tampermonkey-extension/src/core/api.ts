@@ -295,11 +295,43 @@ export async function annotateImageStream(
   }
 }
 
+/**
+ * Simple in-memory cache for text translations with TTL.
+ * Prevents re-sending the same text to the backend on repeated selections.
+ */
+const translationCache = new Map<string, { data: TranslationResponse; expiry: number }>();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_MAX_SIZE = 200;
+
+function getCached(key: string): TranslationResponse | undefined {
+  const entry = translationCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiry) {
+    translationCache.delete(key);
+    return undefined;
+  }
+  return entry.data;
+}
+
+function setCached(key: string, data: TranslationResponse): void {
+  // Evict oldest entries if over limit
+  if (translationCache.size >= CACHE_MAX_SIZE) {
+    const firstKey = translationCache.keys().next().value;
+    if (firstKey !== undefined) translationCache.delete(firstKey);
+  }
+  translationCache.set(key, { data, expiry: Date.now() + CACHE_TTL });
+}
+
 export async function translateText(text: string): Promise<TranslationResponse> {
   const settings = getSettings();
   const endpoint = settings.backendEndpoint;
   const authCode = settings.accessCode;
   const targetLang = settings.targetLanguage;
+
+  // Client-side cache keyed by text+language
+  const cacheKey = `${text}::${targetLang}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
 
   return new Promise((resolve, reject) => {
     GM_xmlhttpRequest({
@@ -322,7 +354,9 @@ export async function translateText(text: string): Promise<TranslationResponse> 
         }
         try {
           const data = JSON.parse(response.responseText);
-          resolve({ success: true, translatedText: data.translated_text || data.translation });
+          const result: TranslationResponse = { success: true, translatedText: data.translated_text || data.translation };
+          setCached(cacheKey, result);
+          resolve(result);
         } catch (err) {
           reject(new Error("Invalid response from server"));
         }
