@@ -1,6 +1,28 @@
 import type { Label } from '../types';
 import { showNotification } from './notification';
 
+/**
+ * Update existing label text with translation results.
+ * Called when the 'translate' SSE event arrives with per-index text updates.
+ */
+export function updateLabelTexts(updates: Array<{ index: number; text: string }>): void {
+  const labels = document.querySelectorAll(".lg-label");
+  for (const update of updates) {
+    const labelEl = labels[update.index] as HTMLElement | undefined;
+    if (!labelEl) continue;
+    const textSpan = labelEl.querySelector(".lg-label-text") as HTMLElement | null;
+    if (textSpan) {
+      textSpan.textContent = update.text;
+      textSpan.dataset.fullText = update.text;
+    }
+    // Also update the tooltip text
+    const tooltip = document.querySelectorAll(".lg-label-tooltip")[update.index] as HTMLElement | undefined;
+    if (tooltip) {
+      tooltip.textContent = update.text.replace(/\n/g, " ");
+    }
+  }
+}
+
 export function displayLabelsOnImage(labels: Label[], imgElement: HTMLImageElement): void {
   removeExistingOverlay();
 
