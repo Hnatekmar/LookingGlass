@@ -9,6 +9,7 @@ export interface GMXMLHttpRequestOptions {
   responseType?: 'blob' | 'json' | 'text' | 'arraybuffer';
   timeout?: number;
   onload?: (response: GMXMLHttpRequestResponse) => void;
+  onprogress?: (response: GMXMLHttpRequestResponse) => void;
   onerror?: (error: { error: string }) => void;
   ontimeout?: () => void;
 }

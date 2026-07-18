@@ -7,7 +7,7 @@ export interface Settings {
   accessCode: string;
   targetLanguage: string;
   autoAnnotate: boolean;
-  qualityMode: 'fast' | 'balanced' | 'accurate';
+  autoTranslate: boolean;
 }
 
 export interface Label {
