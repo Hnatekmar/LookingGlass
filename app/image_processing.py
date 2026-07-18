@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.schema import Label, AnnotationResponse, SSELabelsEventData
 from app.cache import image_annotation_cache, translation_cache, CacheStats
 from app.glm_ocr_client import GLMOCRService
+from app.gemma_ocr_client import GemmaOCRService
 
 
 # Default tile size and overlap for streaming
@@ -29,6 +30,8 @@ _cache_stats = image_annotation_cache.stats
 
 # GLM-OCR service instance (lazy-initialized)
 _glm_ocr_service: Optional[GLMOCRService] = None
+# Gemma OCR service instance (lazy-initialized)
+_gemma_ocr_service: Optional[GemmaOCRService] = None
 
 
 def _get_glm_ocr_service() -> GLMOCRService:
@@ -39,6 +42,16 @@ def _get_glm_ocr_service() -> GLMOCRService:
         _glm_ocr_service = GLMOCRService()
 
     return _glm_ocr_service
+
+
+def _get_gemma_ocr_service() -> GemmaOCRService:
+    """Get or create GemmaOCRService singleton."""
+    global _gemma_ocr_service
+
+    if _gemma_ocr_service is None:
+        _gemma_ocr_service = GemmaOCRService()
+
+    return _gemma_ocr_service
 
 
 def get_image_hash(binary_image: bytes) -> str:
@@ -270,11 +283,17 @@ async def extract_labels_with_cache(
 
 async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
     """
-    Extract text labels from an image using GLM-OCR.
+    Extract text labels from an image using the configured OCR engine.
     """
     settings = get_settings()
 
-    if settings.enable_glm_ocr:
+    if settings.enable_gemma_ocr:
+        logger.info("Using Gemma OCR for text detection")
+        # Prepare image for Gemma OCR
+        prepared_image = await prepare_image_for_glm_ocr(binary_image)
+        gemma_ocr_service = _get_gemma_ocr_service()
+        return await gemma_ocr_service.extract_text_with_bboxes(prepared_image)
+    elif settings.enable_glm_ocr:
         logger.info("Using GLM-OCR for text detection")
         glm_ocr_service = _get_glm_ocr_service()
         return await glm_ocr_service.extract_text_with_bboxes(binary_image)
