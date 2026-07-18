@@ -13,6 +13,7 @@ export function updateLabelTexts(updates: Array<{ index: number; text: string }>
     if (textSpan) {
       textSpan.textContent = update.text;
       textSpan.dataset.fullText = update.text;
+      textSpan.title = update.text;
     }
   }
 }
