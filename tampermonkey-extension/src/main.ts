@@ -1,5 +1,6 @@
 import { injectBaseStyles } from './ui/styles';
 import { setupContextMenu } from './ui/context-menu';
+import { setupAutoTranslate } from './ui/translation';
 import { openSettingsDialog } from './ui/settings';
 
 export function initialize(): void {
@@ -13,6 +14,9 @@ export function initialize(): void {
 
   // Setup context menu
   setupContextMenu();
+
+  // Setup auto-translate on text selection
+  setupAutoTranslate();
 
   console.log("[Image Annotator] Tampermonkey script initialized (v2.0 - TypeScript Edition)");
 }
