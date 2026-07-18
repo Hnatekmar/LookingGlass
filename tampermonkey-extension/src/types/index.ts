@@ -8,7 +8,6 @@ export interface Settings {
   targetLanguage: string;
   autoAnnotate: boolean;
   autoTranslate: boolean;
-  qualityMode: 'fast' | 'balanced' | 'accurate';
 }
 
 export interface Label {

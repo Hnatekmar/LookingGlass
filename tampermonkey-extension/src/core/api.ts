@@ -121,20 +121,16 @@ export async function annotateImage(imageUrl: string, onProgress?: (progress: nu
   const endpoint = settings.backendEndpoint;
   const authCode = settings.accessCode;
   const targetLang = settings.targetLanguage;
-  const qualityMode = settings.qualityMode || "balanced";
-
   try {
     onProgress?.(10);
     const blob = await fetchImageBlob(imageUrl);
     onProgress?.(70);
-    // Don't resize client-side - let backend handle tiling decisions based on quality mode
-    // const resizedBlob = await resizeImageBlob(blob, 1000);
 
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append("data", blob);
 
-      const xhrUrl = `${endpoint}/image/annotate?translate=true&translate_language=${encodeURIComponent(targetLang)}&quality_mode=${encodeURIComponent(qualityMode)}`;
+      const xhrUrl = `${endpoint}/image/annotate?translate=true&translate_language=${encodeURIComponent(targetLang)}`;
 
       GM_xmlhttpRequest({
         method: "POST",
@@ -183,8 +179,6 @@ export async function annotateImageStream(
   const endpoint = settings.backendEndpoint;
   const authCode = settings.accessCode;
   const targetLang = settings.targetLanguage;
-  const qualityMode = settings.qualityMode || "balanced";
-
   try {
     callbacks.onProgress?.(10);
     const blob = await fetchImageBlob(imageUrl);
@@ -194,7 +188,7 @@ export async function annotateImageStream(
       const formData = new FormData();
       formData.append("data", blob);
 
-      const xhrUrl = `${endpoint}/image/annotate/stream?translate=true&translate_language=${encodeURIComponent(targetLang)}&quality_mode=${encodeURIComponent(qualityMode)}`;
+      const xhrUrl = `${endpoint}/image/annotate/stream?translate=true&translate_language=${encodeURIComponent(targetLang)}`;
 
       let buffer = '';
       const allLabels: Label[] = [];

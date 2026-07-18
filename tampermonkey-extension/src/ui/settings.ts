@@ -32,10 +32,6 @@ export function openSettingsDialog(): void {
   const languageGroup = createFormField("Target Language", "text", settings.targetLanguage, "Language for translations (e.g., english, spanish)", "targetLanguage");
   content.appendChild(languageGroup);
 
-  // Quality Mode dropdown
-  const qualityGroup = createQualityModeField(settings.qualityMode || "balanced");
-  content.appendChild(qualityGroup);
-
   // Auto Translate toggle
   const autoTranslateGroup = createToggleField(
     "Auto-Translate Selection",
@@ -44,25 +40,6 @@ export function openSettingsDialog(): void {
     "autoTranslate"
   );
   content.appendChild(autoTranslateGroup);
-
-  // Quality mode description
-  const qualityDesc = document.createElement("div");
-  qualityDesc.style.cssText = `
-    margin-top: -15px;
-    margin-bottom: 20px;
-    padding: 12px;
-    background: #f8fafc;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #64748b;
-    line-height: 1.5;
-  `;
-  qualityDesc.innerHTML = `
-    <strong>Fast:</strong> Quick processing, best for small images<br>
-    <strong>Balanced:</strong> Auto-tiles large images (recommended)<br>
-    <strong>Accurate:</strong> Always tiles for maximum text detection
-  `;
-  content.appendChild(qualityDesc);
 
   // Test connection button
   const testSection = document.createElement("div");
@@ -98,7 +75,6 @@ export function openSettingsDialog(): void {
             backendEndpoint: endpointValue || getDefaults().backendEndpoint,
             accessCode: (document.getElementById("accessCode") as HTMLInputElement).value,
             targetLanguage: (document.getElementById("targetLanguage") as HTMLInputElement).value || "english",
-            qualityMode: (document.getElementById("qualityMode") as HTMLSelectElement).value as 'fast' | 'balanced' | 'accurate',
             autoTranslate: (document.getElementById("autoTranslate") as HTMLInputElement).checked
           };
           saveSettings(newSettings);
@@ -332,54 +308,3 @@ function createToggleField(label: string, description: string, checked: boolean,
   return group;
 }
 
-function createQualityModeField(currentValue: string): HTMLDivElement {
-  const group = document.createElement("div");
-  group.style.cssText = `margin-bottom: 20px;`;
-
-  const labelEl = document.createElement("label");
-  labelEl.textContent = "Quality Mode";
-  labelEl.setAttribute("for", "qualityMode");
-  labelEl.style.cssText = `
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 8px;
-  `;
-
-  const select = document.createElement("select");
-  select.id = "qualityMode";
-  select.style.cssText = `
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 14px;
-    color: #111827;
-    background: #ffffff;
-    transition: all 0.2s;
-    box-sizing: border-box;
-    cursor: pointer;
-  `;
-  select.onfocus = () => { select.style.borderColor = "#3b82f6"; select.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)"; };
-  select.onblur = () => { select.style.borderColor = "#d1d5db"; select.style.boxShadow = "none"; };
-
-  const options = [
-    { value: "fast", label: "Fast (Single Pass)" },
-    { value: "balanced", label: "Balanced (Adaptive Tiling)" },
-    { value: "accurate", label: "Accurate (Always Tile)" }
-  ];
-
-  options.forEach(opt => {
-    const option = document.createElement("option");
-    option.value = opt.value;
-    option.textContent = opt.label;
-    if (opt.value === currentValue) option.selected = true;
-    select.appendChild(option);
-  });
-
-  group.appendChild(labelEl);
-  group.appendChild(select);
-  return group;
-}

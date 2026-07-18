@@ -6,7 +6,6 @@ const DEFAULT_SETTINGS: Settings = {
   targetLanguage: "english",
   autoAnnotate: false,
   autoTranslate: true,
-  qualityMode: "balanced"
 };
 
 export function getSettings(): Settings {
@@ -16,7 +15,6 @@ export function getSettings(): Settings {
     targetLanguage: GM_getValue("targetLanguage", DEFAULT_SETTINGS.targetLanguage),
     autoAnnotate: GM_getValue("autoAnnotate", DEFAULT_SETTINGS.autoAnnotate),
     autoTranslate: GM_getValue("autoTranslate", DEFAULT_SETTINGS.autoTranslate),
-    qualityMode: GM_getValue("qualityMode", DEFAULT_SETTINGS.qualityMode)
   };
 }
 
