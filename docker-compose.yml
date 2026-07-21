@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: lookingglass-app
     ports:
-      - "8090:8090"
+      - "8000:8000"
     depends_on:
       image-annotator:
         condition: service_healthy
@@ -22,7 +22,7 @@ services:
     networks:
       - lookingglass-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
