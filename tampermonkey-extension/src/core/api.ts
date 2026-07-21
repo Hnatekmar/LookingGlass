@@ -135,7 +135,7 @@ export async function annotateImage(imageUrl: string, onProgress?: (progress: nu
       GM_xmlhttpRequest({
         method: "POST",
         url: xhrUrl,
-        headers: { "X-Auth-Code": authCode },
+        headers: { "X-Api-Key": authCode },
         data: formData,
         timeout: 600000,
         onload: (response) => {
@@ -197,7 +197,7 @@ export async function annotateImageStream(
       GM_xmlhttpRequest({
         method: "POST",
         url: xhrUrl,
-        headers: { "X-Auth-Code": authCode },
+        headers: { "X-Api-Key": authCode },
         data: formData,
         timeout: 600000,
         // Use text response type to get progressive chunks via onprogress
@@ -343,7 +343,7 @@ export async function translateText(text: string): Promise<TranslationResponse> 
       url: `${endpoint}/translate?target_language=${encodeURIComponent(targetLang)}`,
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Code": authCode
+        "X-Api-Key": authCode
       },
       data: JSON.stringify({ text: text }),
       timeout: 300000,
