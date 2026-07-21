@@ -5,19 +5,24 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: lookingglass-app
-    env_file:
-      - .env
     ports:
-      - "8090:8090"
+      - "8000:8000"
     depends_on:
       image-annotator:
         condition: service_healthy
     environment:
+      # GLM-OCR endpoint (image-annotator service)
       - IMAGE_MODEL_URL=http://image-annotator:8000/v1
+      # Gemma 12b OCR configuration (optional, defaults to remote endpoint)
+      - ENABLE_GEMMA_OCR=${ENABLE_GEMMA_OCR:-false}
+      - GEMMA_OCR_URL=${GEMMA_OCR_URL:-http://172.16.100.189:8010/v1}
+      - GEMMA_OCR_MODEL=${GEMMA_OCR_MODEL:-gemma-12b}
+      - GEMMA_OCR_TIMEOUT=${GEMMA_OCR_TIMEOUT:-120}
+      - GEMMA_OCR_MAX_TOKENS=${GEMMA_OCR_MAX_TOKENS:-4096}
     networks:
       - lookingglass-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
