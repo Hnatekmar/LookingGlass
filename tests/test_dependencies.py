@@ -51,30 +51,8 @@ def test_build_chat_agent():
     assert hasattr(agent, 'run')
 
 
-def test_build_chat_agent_fallback_url():
-    """Test fallback to llm_base_url."""
-    from app.dependencies import build_chat_agent
-
-    settings = MagicMock()
-    settings.image_model = "vision-model"
-    settings.image_model_url = "http://vision:8000/v1"
-    settings.translation_model = "trans-model"
-    settings.translation_model_url = "http://trans:8001/v1"
-    settings.llm_base_url = "http://fallback:9000/v1"
-    logger = MagicMock()
-
-    # Use a model name that doesn't match image or translation models
-    agent = build_chat_agent(
-        model="unknown-model",
-        prompt="test",
-        settings_obj=settings,
-        logger_obj=logger,
-    )
-    assert agent is not None
-
-
 def test_build_chat_agent_no_url():
-    """Test that missing URL raises ValueError."""
+    """Test that missing URL raises ValueError when model doesn't match."""
     from app.dependencies import build_chat_agent
 
     settings = MagicMock()
@@ -82,8 +60,7 @@ def test_build_chat_agent_no_url():
     settings.image_model_url = "http://vision:8000/v1"
     settings.translation_model = "trans-model"
     settings.translation_model_url = "http://trans:8001/v1"
-    # No llm_base_url
-    del settings.llm_base_url
+    settings.translation_enable_thinking = False
     logger = MagicMock()
 
     with pytest.raises(ValueError, match="No URL configured for model"):

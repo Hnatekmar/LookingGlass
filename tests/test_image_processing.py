@@ -106,7 +106,8 @@ async def test_extract_labels_with_cache_miss():
 
 
 def test_cache_stats_accessible():
-    """Test that _cache_stats is accessible."""
-    from app.image_processing import _cache_stats
-    assert hasattr(_cache_stats, 'hits')
-    assert hasattr(_cache_stats, 'misses')
+    """Test that cache stats are accessible via the cache object."""
+    from app.image_processing import image_annotation_cache
+    stats = image_annotation_cache.stats
+    assert hasattr(stats, 'hits')
+    assert hasattr(stats, 'misses')

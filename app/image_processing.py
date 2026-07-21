@@ -14,17 +14,13 @@ from PIL import Image, ImageEnhance
 from app.common import logger
 from app.config import get_settings
 from app.schema import Label, AnnotationResponse, SSELabelsEventData
-from app.cache import image_annotation_cache, translation_cache, CacheStats
+from app.cache import image_annotation_cache, translation_cache
 from app.glm_ocr_client import GLMOCRService
 
 
 # Default tile size and overlap for streaming
 TILE_SIZE = 1024  # px
 TILE_OVERLAP = 64  # px overlap to avoid cutting text regions
-
-
-# Cache statistics accessor (for API endpoints)
-_cache_stats = image_annotation_cache.stats
 
 
 # GLM-OCR service instance (lazy-initialized)

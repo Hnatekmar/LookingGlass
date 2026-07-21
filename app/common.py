@@ -1,8 +1,10 @@
 import logging
-import os
 
-# Get log level from environment variable, default to INFO
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+from app.config import get_settings
+
+# Get log level from Settings
+settings = get_settings()
+log_level = settings.log_level.upper()
 log_level_value = getattr(logging, log_level, logging.INFO)
 
 # Configure basic logging - set root logger level explicitly

@@ -10,14 +10,15 @@ def test_settings_defaults():
         TRANSLATION_MODEL="test-translator",
         IMAGE_MODEL_URL="http://localhost:8000/v1",
         TRANSLATION_MODEL_URL="http://localhost:8001/v1",
-        CANVAS_WIDTH=500,
-        CANVAS_HEIGHT=500,
     )
     assert settings.image_model == "test-model"
     assert settings.translation_model == "test-translator"
-    assert settings.canvas_width == 500
-    assert settings.canvas_height == 500
     assert settings.default_translate_language == "english"
+    assert settings.port == 8000
+    assert settings.log_level == "INFO"
+    assert settings.cors_origins == "*"
+    assert settings.api_key is None
+    assert settings.translation_enable_thinking is False
 
 
 def test_settings_glm_ocr_defaults():
@@ -30,7 +31,6 @@ def test_settings_glm_ocr_defaults():
     )
     assert settings.enable_glm_ocr is False
     assert settings.glm_ocr_timeout == 60
-    assert settings.glm_ocr_max_tokens == 4096
     assert settings.translation_timeout == 600
 
 
@@ -73,12 +73,16 @@ def test_get_settings_returns_settings():
     assert isinstance(s, Settings)
 
 
-def test_settings_redis_default():
-    """Test Redis URL defaults to None."""
+def test_settings_new_defaults():
+    """Test new config fields have correct defaults."""
     settings = Settings(
         IMAGE_MODEL="test-model",
         TRANSLATION_MODEL="test-translator",
         IMAGE_MODEL_URL="http://localhost:8000/v1",
         TRANSLATION_MODEL_URL="http://localhost:8001/v1",
     )
-    assert settings.redis_url is None
+    assert settings.port == 8000
+    assert settings.log_level == "INFO"
+    assert settings.cors_origins == "*"
+    assert settings.api_key is None
+    assert settings.translation_enable_thinking is False

@@ -10,8 +10,6 @@ rest of the codebase free of hidden globals.
 import logging
 from typing import Optional, Type
 
-import redis.asyncio as redis
-
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 

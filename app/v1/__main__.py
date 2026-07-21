@@ -6,7 +6,6 @@ Changes to environment variables require a process restart to take effect.
 
 import hmac
 import logging
-import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,9 +22,10 @@ logger = logging.getLogger(__name__)
 # instead of "*" when allow_credentials=True.
 app = FastAPI(redirect_slashes=False)
 
-# For production deployments, set CORS_ORIGINS env var to a comma-separated
-# list of allowed origins. Falls back to "*" for development convenience.
-_cors_origins_str = os.getenv("CORS_ORIGINS", "*")
+_settings = get_settings()
+
+# Parse CORS origins from Settings
+_cors_origins_str = _settings.cors_origins
 _cors_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()]
 # If the parsed origin list is empty (e.g. misconfigured as ","), fall back to "*"
 if not _cors_origins:
@@ -47,9 +47,9 @@ app.add_middleware(
 )
 
 # Optional API key authentication middleware
-# Set API_KEY env var to enable. Requests must include X-API-Key header.
+# Read from Settings (which sources from API_KEY env var)
 # Note: Read once at import time; requires restart to pick up changes.
-_API_KEY = os.getenv("API_KEY")
+_API_KEY = _settings.api_key
 
 
 @app.middleware("http")
