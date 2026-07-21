@@ -106,7 +106,8 @@ async def test_translate_labels_individual():
 
 
 def test_translation_cache_stats_accessible():
-    """Test that _translation_cache_stats is accessible."""
-    from app.translation import _translation_cache_stats
-    assert hasattr(_translation_cache_stats, 'hits')
-    assert hasattr(_translation_cache_stats, 'misses')
+    """Test that cache stats are accessible via the cache object."""
+    from app.cache import translation_cache
+    stats = translation_cache.stats
+    assert hasattr(stats, 'hits')
+    assert hasattr(stats, 'misses')
