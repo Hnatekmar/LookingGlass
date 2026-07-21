@@ -25,9 +25,11 @@ def test_get_image_hash_deterministic():
 
 
 @pytest.mark.asyncio
-async def test_prepare_image_for_glm_ocr():
-    """Test image preparation returns bytes."""
-    from app.image_processing import prepare_image_for_glm_ocr
+async def test_prepare_image_for_gemma_provider():
+    """Test image preparation via GemmaProvider returns bytes."""
+    from app.providers.gemma_provider import GemmaProvider
+
+    provider = GemmaProvider()
 
     # Create a small valid JPEG
     import io
@@ -38,17 +40,19 @@ async def test_prepare_image_for_glm_ocr():
     img.save(buf, format="JPEG")
     img_bytes = buf.getvalue()
 
-    result = await prepare_image_for_glm_ocr(img_bytes)
+    result = await provider._prepare_image(img_bytes)
     assert isinstance(result, bytes)
     assert len(result) > 0
 
 
 @pytest.mark.asyncio
-async def test_prepare_image_for_glm_ocr_resizes():
+async def test_prepare_image_for_gemma_provider_resizes():
     """Test that large images are resized."""
-    from app.image_processing import prepare_image_for_glm_ocr
+    from app.providers.gemma_provider import GemmaProvider
     import io
     from PIL import Image
+
+    provider = GemmaProvider()
 
     # Create a large image
     img = Image.new("RGB", (3000, 2000), color="blue")
@@ -56,7 +60,7 @@ async def test_prepare_image_for_glm_ocr_resizes():
     img.save(buf, format="JPEG")
     img_bytes = buf.getvalue()
 
-    result = await prepare_image_for_glm_ocr(img_bytes)
+    result = await provider._prepare_image(img_bytes)
     # Should be resized
     result_img = Image.open(io.BytesIO(result))
     assert result_img.size[0] <= 1280

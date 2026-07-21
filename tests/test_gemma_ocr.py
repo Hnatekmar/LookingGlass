@@ -272,23 +272,18 @@ async def test_gemma_ocr_image_processing_integration():
 
     with patch("app.image_processing.get_settings") as mock_get_settings:
         mock_settings = MagicMock()
-        mock_settings.enable_gemma_ocr = True
+        mock_settings.ocr_provider = "gemma"
         mock_settings.enable_glm_ocr = False
         mock_get_settings.return_value = mock_settings
 
-        with patch("app.image_processing._get_gemma_ocr_service") as mock_get_service:
-            mock_service = AsyncMock()
-            mock_service.extract_text_with_bboxes.return_value = AnnotationResponse(
-                labels=[Label(x1=0.1, y1=0.2, x2=0.5, y2=0.6, text="Gemma OCR")]
-            )
-            mock_get_service.return_value = mock_service
+        mock_gemma_provider = AsyncMock()
+        mock_gemma_provider.extract_text.return_value = AnnotationResponse(
+            labels=[Label(x1=0.1, y1=0.2, x2=0.5, y2=0.6, text="Gemma OCR")]
+        )
 
-            with patch("app.image_processing.prepare_image_for_glm_ocr", new_callable=AsyncMock) as mock_prep:
-                mock_prep.return_value = b"prepared-image"
+        with patch("app.image_processing.get_provider", return_value=mock_gemma_provider):
+            result = await _extract_labels_from_image(b"raw-image")
 
-                result = await _extract_labels_from_image(b"raw-image")
-
-                assert len(result.labels) == 1
-                assert result.labels[0].text == "Gemma OCR"
-                mock_prep.assert_called_once_with(b"raw-image")
-                mock_service.extract_text_with_bboxes.assert_called_once_with(b"prepared-image")
+            assert len(result.labels) == 1
+            assert result.labels[0].text == "Gemma OCR"
+            mock_gemma_provider.extract_text.assert_called_once_with(b"raw-image")

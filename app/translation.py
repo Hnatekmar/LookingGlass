@@ -11,6 +11,7 @@ from typing import List
 from pydantic import BaseModel
 
 from app.common import logger
+from app.prompts import get_prompt
 from app.config import get_settings
 from app.container import get_chat_agent
 from app.schema import Label
@@ -67,7 +68,7 @@ async def translate_labels_with_cache(
 async def _translate_text(text: str, translate_language: str) -> str:
     """Translate a single text string."""
     settings = get_settings()
-    translate_prompt = settings.translate_prompt_template.format(language=translate_language)
+    translate_prompt = get_prompt(settings.translate_prompt_path).format(language=translate_language)
     translator = get_chat_agent(
         model=settings.translation_model,
         prompt=translate_prompt,
@@ -99,7 +100,7 @@ async def _translate_labels_batch(
     logger.info(f"Translation input: {batch_input_str[:500]}{'...' if len(batch_input_str) > 500 else ''}")
     
     settings = get_settings()
-    batch_prompt = settings.batch_translate_prompt_template.format(language=translate_language)
+    batch_prompt = get_prompt(settings.batch_translate_prompt_path).format(language=translate_language)
     
     # Use structured output with TranslatedLabel
     translator = get_chat_agent(

@@ -1,7 +1,7 @@
 """
 Image processing for Looking Glass.
 
-Uses GLM-OCR for text detection with caching support.
+Uses the configured OCR provider for text detection with caching support.
 Contains tile-aware functions for SSE streaming.
 """
 
@@ -15,8 +15,7 @@ from app.common import logger
 from app.config import get_settings
 from app.schema import Label, AnnotationResponse, SSELabelsEventData
 from app.cache import image_annotation_cache, translation_cache
-from app.glm_ocr_client import GLMOCRService
-from app.gemma_ocr_client import GemmaOCRService
+from app.providers.registry import get_provider
 
 
 # Default tile size and overlap for streaming
@@ -24,62 +23,9 @@ TILE_SIZE = 1024  # px
 TILE_OVERLAP = 64  # px overlap to avoid cutting text regions
 
 
-# GLM-OCR service instance (lazy-initialized)
-_glm_ocr_service: Optional[GLMOCRService] = None
-# Gemma OCR service instance (lazy-initialized)
-_gemma_ocr_service: Optional[GemmaOCRService] = None
-
-
-def _get_glm_ocr_service() -> GLMOCRService:
-    """Get or create GLMOCRService singleton."""
-    global _glm_ocr_service
-
-    if _glm_ocr_service is None:
-        _glm_ocr_service = GLMOCRService()
-
-    return _glm_ocr_service
-
-
-def _get_gemma_ocr_service() -> GemmaOCRService:
-    """Get or create GemmaOCRService singleton."""
-    global _gemma_ocr_service
-
-    if _gemma_ocr_service is None:
-        _gemma_ocr_service = GemmaOCRService()
-
-    return _gemma_ocr_service
-
-
 def get_image_hash(binary_image: bytes) -> str:
     """Generate a SHA256 hash of the image content."""
     return hashlib.sha256(binary_image).hexdigest()
-
-
-async def prepare_image_for_glm_ocr(image_bytes: bytes) -> bytes:
-    """
-    Prepare image for GLM-OCR processing.
-
-    - Resize to 1280px max (optimal for GLM-OCR)
-    - Maintain RGB color
-    - Apply mild sharpness enhancement
-    """
-    img = Image.open(io.BytesIO(image_bytes))
-
-    # Convert to RGB if necessary
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-
-    # Resize to GLM-OCR optimal size
-    img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
-
-    # Mild sharpness enhancement for text edges
-    img = ImageEnhance.Sharpness(img).enhance(1.15)
-
-    output = io.BytesIO()
-    img.save(output, format="JPEG", quality=95, optimize=True)
-
-    logger.info(f"Image prepared for GLM-OCR: {img.size}")
-    return output.getvalue()
 
 
 def _compute_tiles(image_width: int, image_height: int) -> list[dict]:
@@ -279,51 +225,15 @@ async def extract_labels_with_cache(
 
 async def _extract_labels_from_image(binary_image: bytes) -> AnnotationResponse:
     """
-    Extract text labels from an image using the configured OCR engine.
+    Extract text labels from an image using the configured OCR provider.
+
+    Resolves the provider from ``settings.ocr_provider`` and delegates
+    ``extract_text`` to it.
     """
     settings = get_settings()
 
-    if settings.enable_gemma_ocr:
-        logger.info("Using Gemma OCR for text detection")
-        # Prepare image for Gemma OCR
-        prepared_image = await prepare_image_for_glm_ocr(binary_image)
-        gemma_ocr_service = _get_gemma_ocr_service()
-        return await gemma_ocr_service.extract_text_with_bboxes(prepared_image)
-    elif settings.enable_glm_ocr:
-        logger.info("Using GLM-OCR for text detection")
-        glm_ocr_service = _get_glm_ocr_service()
-        return await glm_ocr_service.extract_text_with_bboxes(binary_image)
-    else:
-        # Fallback to VLM-based detection (simplified, no tiling)
-        logger.info("Using VLM fallback for text detection")
-        from app.container import get_chat_agent
-        from pydantic_ai import BinaryContent
-
-        # Prepare image for VLM
-        img = Image.open(io.BytesIO(binary_image))
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-        img = ImageEnhance.Contrast(img).enhance(1.3)
-
-        output = io.BytesIO()
-        img.save(output, format="JPEG", quality=95)
-
-        labeler = get_chat_agent(
-            model=settings.image_model,
-            prompt=settings.label_prompt,
-            output_type=list[Label],
-        )
-
-        result = await labeler.run([BinaryContent(data=output.getvalue(), media_type="image/jpeg")])
-        labels = result.output
-
-        # Normalize coordinates to 0-1 range
-        # Label prompt specifies 0-1000 coordinate scale, so divide by 1000.0
-        for label in labels:
-            label.x1 /= 1000.0
-            label.x2 /= 1000.0
-            label.y1 /= 1000.0
-            label.y2 /= 1000.0
-
-        return AnnotationResponse(labels=labels)
+    # Resolve the provider by name — the registry returns a cached or fresh
+    # VisionProvider instance that manages its own service internally.
+    provider = get_provider(settings.ocr_provider)
+    logger.info(f"Using OCR provider: {settings.ocr_provider}")
+    return await provider.extract_text(binary_image)
