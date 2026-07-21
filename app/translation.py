@@ -14,16 +14,12 @@ from app.common import logger
 from app.config import get_settings
 from app.container import get_chat_agent
 from app.schema import Label
-from app.cache import translation_cache, CacheStats
+from app.cache import translation_cache
 
 
 class TranslatedLabel(Label):
     """Label with translated text."""
     translated_text: str
-
-
-# Cache statistics accessor (for API endpoints)
-_translation_cache_stats = translation_cache.stats
 
 
 async def translate_labels_with_cache(

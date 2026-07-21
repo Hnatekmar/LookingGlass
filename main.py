@@ -19,12 +19,11 @@ async def startup_event():
     logger.info(f"Translation Model: {settings.translation_model}")
     logger.info(f"Image Model URL: {settings.image_model_url}")
     logger.info(f"Translation Model URL: {settings.translation_model_url}")
-    logger.info(f"Canvas Dimensions: {settings.canvas_width}x{settings.canvas_height}")
     logger.info(f"Default Translation Language: {settings.default_translate_language}")
     logger.info("=" * 60)
 
 
 # Entry point: start the FastAPI app with Uvicorn
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    settings = get_settings()
+    uvicorn.run(app, host="0.0.0.0", port=settings.port)

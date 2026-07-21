@@ -89,40 +89,6 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     - Scan the ENTIRE image from left to right, edge to edge
     """  # End of label prompt template
 
-    # GLM-OCR optimized prompt - leverages GLM-OCR's native OCR capabilities
-    glm_ocr_prompt: str = """You are an expert OCR (Optical Character Recognition) system.
-    
-    **Task:** Detect ALL text regions in the image and extract the text content.
-    
-    **CRITICAL REQUIREMENTS:**
-    1. Detect EVERY text region - completeness is the highest priority
-    2. Extract text accurately, preserving original formatting
-    3. Handle multiple languages (Japanese, Chinese, Korean, English, etc.)
-    4. Process vertical and horizontal text correctly
-    
-    **Detection Scope:**
-    - Speech bubbles, dialogue, captions
-    - Vertical text columns (keep each column as ONE region)
-    - Signs, labels, buttons, UI elements
-    - Background text, posters, screens
-    - Handwritten and stylized text
-    - Text at ALL edges (left, right, top, bottom)
-    - Small text (minimum 8px height)
-    
-    **Output Format:**
-    - JSON array of objects with: x1, y1, x2, y2 (normalized 0-1000), text
-    - Coordinates: x1,y1 = top-left, x2,y2 = bottom-right
-    - Include ALL detected text regions
-    - Do not miss any text - false positives are acceptable
-    
-    **Special Handling:**
-    - Vertical text: ONE box per column, top to bottom
-    - Curved text: Use tight bounding box
-    - Faded/low-contrast text: Still detect and extract
-    - Partially occluded text: Detect visible portions
-    
-    Scan systematically: left→right, top→bottom. Verify all edges before responding."""
-
     # API endpoints
     image_model_url: str = Field(
         ..., alias="IMAGE_MODEL_URL"
@@ -130,14 +96,6 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
     translation_model_url: str = Field(
         ..., alias="TRANSLATION_MODEL_URL"
     )  # Translation model API URL from environment variable
-
-    # Canvas dimensions
-    canvas_width: int = Field(
-        1000, alias="CANVAS_WIDTH"
-    )  # Canvas width for image processing
-    canvas_height: int = Field(
-        1000, alias="CANVAS_HEIGHT"
-    )  # Canvas height for image processing
 
     # Translation prompt template (for individual text)
     translate_prompt_template: str = """You are a translator. Translate the following text into natural, idiomatic {language}.
@@ -178,17 +136,6 @@ Input: {{input}}"""
         "english", alias="DEFAULT_TRANSLATE_LANGUAGE"
     )
 
-    # Optional generic LLM base URL (fallback for models not explicitly configured)
-    llm_base_url: str | None = (
-        None  # Generic LLM base URL (optional, falls back to specific model URLs)
-    )
-
-    # Redis Configuration
-    # Redis URL for caching (optional)
-    # Format: redis://host:port/db or rediss://host:port/db for TLS
-    # Example: redis://localhost:6379/0 or redis://user:pass@redis.example.com:6379/0
-    redis_url: str | None = Field(None, alias="REDIS_URL")
-
     # GLM-OCR Specific Configuration (Official SDK)
     # Enable GLM-OCR mode (uses official GLM-OCR SDK pipeline)
     enable_glm_ocr: bool = Field(False, alias="ENABLE_GLM_OCR")
@@ -196,10 +143,29 @@ Input: {{input}}"""
     glm_ocr_timeout: int = Field(60, alias="GLM_OCR_TIMEOUT")
     # Translation model timeout (seconds) - higher for thinking mode
     translation_timeout: int = Field(600, alias="TRANSLATION_TIMEOUT")
-    # GLM-OCR HTTP connection pool size
-    glm_ocr_pool_size: int = Field(10, alias="GLM_OCR_POOL_SIZE")
-    # GLM-OCR max tokens in response
-    glm_ocr_max_tokens: int = Field(4096, alias="GLM_OCR_MAX_TOKENS")
+
+    # Gemma OCR Configuration (OpenAI-compatible API)
+    # Enable Gemma OCR mode (uses vision-language model via OpenAI-compatible API)
+    enable_gemma_ocr: bool = Field(False, alias="ENABLE_GEMMA_OCR")
+    # Gemma OCR API endpoint URL
+    gemma_ocr_url: str = Field(
+        "http://172.16.100.189:8010/v1", alias="GEMMA_OCR_URL"
+    )
+    # Gemma OCR model name
+    gemma_ocr_model: str = Field("gemma-12b", alias="GEMMA_OCR_MODEL")
+    # Gemma OCR request timeout (seconds)
+    gemma_ocr_timeout: int = Field(120, alias="GEMMA_OCR_TIMEOUT")
+    # Gemma OCR max tokens in response
+    gemma_ocr_max_tokens: int = Field(4096, alias="GEMMA_OCR_MAX_TOKENS")
+
+    # Application settings (centralized, replacing direct os.getenv calls)
+    cors_origins: str = Field("*", alias="CORS_ORIGINS")
+    api_key: str | None = Field(None, alias="API_KEY")
+    log_level: str = Field("INFO", alias="LOG_LEVEL")
+    port: int = Field(8000, alias="PORT")
+
+    # Translation enable_thinking (Qwen-specific, default: disabled for speed)
+    translation_enable_thinking: bool = Field(False, alias="TRANSLATION_ENABLE_THINKING")
 
     @property
     def glm_ocr_host(self) -> str:

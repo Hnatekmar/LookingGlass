@@ -8,8 +8,8 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.image_processing import get_image_hash, extract_labels_with_cache, stream_labels_from_image, _cache_stats
-from app.translation import translate_labels_with_cache, _translation_cache_stats
+from app.image_processing import get_image_hash, extract_labels_with_cache, stream_labels_from_image
+from app.translation import translate_labels_with_cache
 from app.cache import image_annotation_cache, translation_cache
 from app.schema import (
     SSELabelsEventData,
@@ -38,17 +38,17 @@ async def get_cache_stats():
     """Get cache statistics for monitoring."""
     return {
         "image_annotation": {
-            "hits": _cache_stats.hits,
-            "misses": _cache_stats.misses,
-            "evictions": _cache_stats.evictions,
-            "hit_rate": _cache_stats.hit_rate,
+            "hits": image_annotation_cache.stats.hits,
+            "misses": image_annotation_cache.stats.misses,
+            "evictions": image_annotation_cache.stats.evictions,
+            "hit_rate": image_annotation_cache.stats.hit_rate,
             "cache_size": len(image_annotation_cache)
         },
         "translation": {
-            "hits": _translation_cache_stats.hits,
-            "misses": _translation_cache_stats.misses,
-            "evictions": _translation_cache_stats.evictions,
-            "hit_rate": _translation_cache_stats.hit_rate,
+            "hits": translation_cache.stats.hits,
+            "misses": translation_cache.stats.misses,
+            "evictions": translation_cache.stats.evictions,
+            "hit_rate": translation_cache.stats.hit_rate,
             "cache_size": len(translation_cache)
         }
     }
