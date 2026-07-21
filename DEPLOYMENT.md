@@ -1,237 +1,90 @@
-# Looking Glass Deployment Quick Reference
+# Deployment
 
-## Helm Chart
+LookingGlass can be deployed via Docker, systemd, or Podman Quadlets.
 
-### Basic Installation
+## Docker
 
-```bash
-helm install looking-glass ./charts/looking-glass \
-  --namespace looking-glass \
-  --create-namespace \
-  --set secrets.imageModel="qwen3-8b-instruct" \
-  --set secrets.translationModel="nemotron-3-nano" \
-  --set secrets.imageModelUrl="https://your-model-url.com/v1" \
-  --set secrets.translationModelUrl="https://your-translation-model-url.com/v1"
-```
-
-### Production Installation (with custom values)
+### Build and Run
 
 ```bash
-helm install looking-glass ./charts/looking-glass \
-  -f charts/looking-glass/values-production.yaml \
-  --namespace looking-glass \
-  --create-namespace
+# Build the image
+docker build -t looking-glass:latest .
+
+# Run with environment variables
+docker run -d \
+  --name lookingglass \
+  -p 8000:8000 \
+  -e IMAGE_MODEL=your-model \
+  -e TRANSLATION_MODEL=your-model \
+  -e IMAGE_MODEL_URL=http://your-vllm-server:8000/v1 \
+  -e TRANSLATION_MODEL_URL=http://your-translation-server:8001/v1 \
+  looking-glass:latest
 ```
 
-### Upgrade
+### Docker Compose
+
+The `docker-compose.yml` includes both the LookingGlass app and a vLLM server
+for GLM-OCR:
 
 ```bash
-helm upgrade looking-glass ./charts/looking-glass \
-  -f charts/looking-glass/values-production.yaml \
-  --namespace looking-glass
+docker compose up --build
 ```
 
-### Uninstall
+This is the recommended approach for local development.
 
-```bash
-helm uninstall looking-glass --namespace looking-glass
-```
+### CI/CD Build
 
-### Access the Service
+The repository has a CI workflow (`build-docker-images.yml`) that:
+- Builds and pushes to `gitea.hnatekmar.xyz/public/looking-glass`
+- Tags with `:latest` (on main) and `:sha-<short>` (all pushes)
+- Tags with `:v<semver>` on version tags
+- Uses BuildKit caching for faster builds
 
-```bash
-# Port-forward (ClusterIP)
-kubectl port-forward svc/looking-glass 8000:8000 -n looking-glass
+## Systemd / Podman Quadlets
 
-# View logs
-kubectl logs -f deployment/looking-glass -n looking-glass
+The production deployment uses Podman Quadlets with systemd service files.
+The `lookingglass.service` file is provided as a reference.
 
-# Check status
-kubectl get pods -n looking-glass
-kubectl get svc -n looking-glass
-```
+1. Copy the service file:
+   ```bash
+   sudo cp lookingglass.service /etc/systemd/system/
+   ```
 
-## ArgoCD
+2. Edit the service to set your environment variables and paths
 
-### Apply ArgoCD Application
-
-```bash
-kubectl apply -f argocd-application.yaml
-```
-
-### Monitor in ArgoCD UI
-
-```bash
-# Port-forward ArgoCD
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-
-# Get admin password
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-```
-
-### ArgoCD CLI
-
-```bash
-# Login to ArgoCD
-argocd login localhost:8080
-
-# Check application status
-argocd app get looking-glass
-
-# Sync application
-argocd app sync looking-glass
-
-# Pause auto-sync
-argocd app set looking-glass --sync-policy none
-```
+3. Start the service:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now lookingglass
+   ```
 
 ## Configuration
 
-### Required Secrets
-
-All secrets must be set before deployment:
-
-- `secrets.imageModel` - Image/OCR model name
-- `secrets.translationModel` - Translation model name
-- `secrets.imageModelUrl` - Image model API endpoint
-- `secrets.translationModelUrl` - Translation model API endpoint
-
-### Optional Configuration
-
-```yaml
-# Production values (charts/looking-glass/values-production.yaml)
-replicaCount: 3
-
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
-
-ingress:
-  enabled: true
-  className: "nginx"
-  hosts:
-    - host: looking-glass.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: looking-glass-tls
-      hosts:
-        - looking-glass.example.com
-
-pdb:
-  enabled: true
-  minAvailable: 1
-```
-
-## Troubleshooting
-
-### Pod Stuck in Pending
+All configuration is via environment variables. Copy `.env.example` to `.env`
+and customize:
 
 ```bash
-kubectl describe pod <pod-name> -n looking-glass
-kubectl get events -n looking-glass --sort-by='.lastTimestamp'
+cp .env.example .env
+# EDIT .env with your values
 ```
 
-### Pod CrashLoopBackOff
+Required variables:
+- `IMAGE_MODEL` — Vision/OCR model name
+- `TRANSLATION_MODEL` — Translation model name
+- `IMAGE_MODEL_URL` — OpenAI-compatible API endpoint
+- `TRANSLATION_MODEL_URL` — Translation model API endpoint
+
+## Health Check
+
+The service exposes a health check at `/v1/health`:
 
 ```bash
-kubectl logs deployment/looking-glass -n looking-glass --previous
-kubectl describe deployment/looking-glass -n looking-glass
+curl http://localhost:8000/v1/health
+# {"status":"healthy","service":"Image Annotator Backend","version":"1.0.0"}
 ```
 
-### Health Check Failures
+## Notes
 
-```bash
-# Check if endpoint is accessible
-kubectl exec -it <pod-name> -n looking-glass -- curl -s http://localhost:8000/docs
-
-# Check resource usage
-kubectl top pods -n looking-glass
-```
-
-## Security Best Practices
-
-1. **Never commit secrets** - Use external secrets management for production
-2. **Enable Pod Security** - Non-root user, read-only filesystem (enabled by default)
-3. **Use HTTPS** - Configure TLS in Ingress
-4. **Network Policies** - Restrict pod-to-pod communication
-5. **Resource Limits** - Prevent resource exhaustion
-
-## External Secrets (Production)
-
-For production, use External Secrets Operator:
-
-```yaml
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: looking-glass-secrets
-  namespace: looking-glass
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    kind: ClusterSecretStore
-    name: vault-backend
-  target:
-    name: looking-glass-secrets
-  data:
-    - secretKey: IMAGE_MODEL
-      remoteRef:
-        key: looking-glass
-        property: image_model
-    # ... more secrets
-```
-
-Then update `values-production.yaml`:
-```yaml
-secrets:
-  imageModel: ""  # Leave empty, will be populated by ExternalSecret
-  translationModel: ""
-  imageModelUrl: ""
-  translationModelUrl: ""
-```
-
-## Chart Structure
-
-```
-charts/looking-glass/
-├── Chart.yaml              # Chart metadata
-├── values.yaml             # Default values
-├── values-production.yaml  # Production example
-├── values.schema.json      # Validation schema
-└── templates/
-    ├── _helpers.tpl        # Template helpers
-    ├── namespace.yaml      # Optional namespace
-    ├── configmap.yaml      # Non-sensitive config
-    ├── secret.yaml         # Sensitive config
-    ├── deployment.yaml     # Main deployment
-    ├── service.yaml        # Service
-    ├── ingress.yaml        # Ingress (optional)
-    ├── pdb.yaml            # PodDisruptionBudget (optional)
-    ├── serviceaccount.yaml # ServiceAccount
-    └── NOTES.txt           # Post-install notes
-```
-
-## API Endpoints
-
-Once deployed:
-
-- **API**: `http://localhost:8000/` (via port-forward) or `https://looking-glass.example.com/` (via Ingress)
-- **Docs**: `http://localhost:8000/docs` (Swagger UI)
-- **Health**: `http://localhost:8000/health` (if configured)
-
-## Next Steps
-
-1. ✅ Helm chart created and validated
-2. ✅ ArgoCD application configured
-3. ✅ Production values provided
-4. ⏳ Update repository URL in `argocd-application.yaml`
-5. ⏳ Configure secrets for your environment
-6. ⏳ Set up external secrets management (production)
-7. ⏳ Configure Ingress and TLS
-8. ⏳ Deploy and test
+- The default port is 8000 (configurable via `PORT` env var)
+- API key authentication is optional (set `API_KEY` to enable)
+- CORS is wide-open by default (`*`); restrict `CORS_ORIGINS` in production
