@@ -1,26 +1,55 @@
-name: Build Image using Dockerfile
+name: Build Docker Image
+
 on:
   push:
+    branches: [main]
     paths:
       - Dockerfile
+      - .dockerignore
       - pyproject.toml
       - uv.lock
       - app/**
+    tags:
+      - "v*"
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build image
-    runs-on: dind
+    name: Build and push
+    runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4.2.2
-    - name: remove all docker images
-      run: docker rmi $(docker image ls -aq) --force || true
-    - uses: docker/login-action@v3
-      with:
-        registry: gitea.hnatekmar.xyz
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-    - run: |
-        docker system prune --all
-        docker build . -t gitea.hnatekmar.xyz/public/looking-glass:latest
-        docker push gitea.hnatekmar.xyz/public/looking-glass:latest
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Gitea Registry
+        uses: docker/login-action@v3
+        with:
+          registry: gitea.hnatekmar.xyz
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Generate metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: gitea.hnatekmar.xyz/public/looking-glass
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+            type=sha,prefix=,suffix=,format=short
+            type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern=v{{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
