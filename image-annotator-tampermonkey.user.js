@@ -698,7 +698,7 @@
       GM_xmlhttpRequest({
         method: "POST",
         url: xhrUrl,
-        headers: { "X-Auth-Code": authCode },
+        headers: { "X-API-Key": authCode },
         data: formData,
         timeout: 600000,
         onload: (response) => {
@@ -1024,7 +1024,7 @@
         url: `${endpoint}/translate?target_language=${encodeURIComponent(targetLang)}`,
         headers: {
           "Content-Type": "application/json",
-          "X-Auth-Code": authCode
+          "X-API-Key": authCode
         },
         data: JSON.stringify({ text: text }),
         timeout: 300000,
