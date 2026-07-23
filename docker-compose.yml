@@ -11,14 +11,30 @@ services:
       image-annotator:
         condition: service_healthy
     environment:
-      # GLM-OCR endpoint (image-annotator service)
+      # Required: model and endpoint configuration
+      - IMAGE_MODEL=${IMAGE_MODEL:-zai-org/GLM-OCR}
+      - TRANSLATION_MODEL=${TRANSLATION_MODEL:-nemotron-3-nano}
       - IMAGE_MODEL_URL=http://image-annotator:8000/v1
+      - TRANSLATION_MODEL_URL=${TRANSLATION_MODEL_URL:-http://host.docker.internal:8000/v1}
+      # Server port (inside container)
+      - PORT=8090
+      # Canvas defaults
+      - CANVAS_WIDTH=${CANVAS_WIDTH:-1000}
+      - CANVAS_HEIGHT=${CANVAS_HEIGHT:-1000}
+      # Default translation language
+      - DEFAULT_TRANSLATE_LANGUAGE=${DEFAULT_TRANSLATE_LANGUAGE:-english}
+      # GLM-OCR configuration
+      - ENABLE_GLM_OCR=${ENABLE_GLM_OCR:-false}
+      - GLM_OCR_TIMEOUT=${GLM_OCR_TIMEOUT:-60}
+      - GLM_OCR_MAX_TOKENS=${GLM_OCR_MAX_TOKENS:-4096}
       # Gemma 12b OCR configuration (optional, defaults to remote endpoint)
       - ENABLE_GEMMA_OCR=${ENABLE_GEMMA_OCR:-false}
       - GEMMA_OCR_URL=${GEMMA_OCR_URL:-http://172.16.100.189:8010/v1}
       - GEMMA_OCR_MODEL=${GEMMA_OCR_MODEL:-gemma-12b}
       - GEMMA_OCR_TIMEOUT=${GEMMA_OCR_TIMEOUT:-120}
       - GEMMA_OCR_MAX_TOKENS=${GEMMA_OCR_MAX_TOKENS:-4096}
+      # Redis (optional)
+      - REDIS_URL=${REDIS_URL:-}
     networks:
       - lookingglass-network
     healthcheck:

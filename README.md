@@ -62,6 +62,11 @@ The API will be available at `http://localhost:8090`.
 ### Docker
 
 ```bash
+# Docker compose configures all required defaults in docker-compose.yml.
+# Override any setting via shell environment variables:
+#   TRANSLATION_MODEL_URL=http://my-translator:8000/v1 docker compose up --build
+#
+# No .env file is needed for Docker usage — everything is pre-configured.
 docker compose up --build
 ```
 
