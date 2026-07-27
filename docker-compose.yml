@@ -56,6 +56,34 @@ services:
               count: 1
               capabilities: [gpu]
 
+  # Optional: Local Gemma 12B OCR service (uncomment to use instead of remote endpoint)
+  # gemma-ocr:
+  #   image: vllm/vllm-openai:nightly
+  #   container_name: lookingglass-gemma-ocr
+  #   volumes:
+  #     - huggingface:/root/.cache/huggingface
+  #   command: >
+  #     google/gemma-12b-it
+  #     --max-model-len 8192
+  #     --gpu-memory-util 0.8
+  #   runtime: nvidia
+  #   restart: unless-stopped
+  #   networks:
+  #     - lookingglass-network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8010/v1/models"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 120s
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+
 volumes:
   huggingface:
     name: huggingface-cache
