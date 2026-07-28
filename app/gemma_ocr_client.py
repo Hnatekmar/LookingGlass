@@ -73,14 +73,14 @@ class GemmaOCRService:
     Configuration loaded from .env:
         - GEMMA_OCR_URL: API endpoint URL
         - GEMMA_OCR_MODEL: Model name (default: gemma-12b)
-        - GEMMA_OCR_TIMEOUT: Request timeout in seconds
+        - OCR_TIMEOUT: Request timeout in seconds
     """
 
     def __init__(self):
         settings = get_settings()
         self.api_url = settings.gemma_ocr_url.rstrip("/") + "/chat/completions"
         self.model = settings.gemma_ocr_model
-        self.timeout = settings.gemma_ocr_timeout
+        self.timeout = settings.ocr_timeout
         self.max_tokens = settings.gemma_ocr_max_tokens
 
         # Create a dedicated HTTP client for Gemma OCR

@@ -9,7 +9,7 @@ def test_get_http_client():
 
     settings = MagicMock()
     settings.translation_timeout = 180
-    settings.gemma_ocr_timeout = 120
+    settings.ocr_timeout = 120
 
     client = get_http_client(settings, for_translation=False)
     assert client is not None
@@ -24,7 +24,7 @@ def test_get_http_client_translation():
 
     settings = MagicMock()
     settings.translation_timeout = 300
-    settings.gemma_ocr_timeout = 120
+    settings.ocr_timeout = 120
 
     client = get_http_client(settings, for_translation=True)
     assert client is not None

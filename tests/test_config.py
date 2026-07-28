@@ -94,7 +94,7 @@ def test_settings_ocr_timeout_defaults():
         IMAGE_MODEL_URL="http://localhost:8000/v1",
         TRANSLATION_MODEL_URL="http://localhost:8001/v1",
     )
-    assert settings.gemma_ocr_timeout == 120
+    assert settings.ocr_timeout == 120
     assert settings.translation_timeout == 600
 
 
@@ -153,7 +153,7 @@ def test_settings_gemma_defaults():
     # values reflect those overrides.  Verify the *fields* exist.
     assert isinstance(settings.gemma_ocr_url, str)
     assert isinstance(settings.gemma_ocr_model, str)
-    assert settings.gemma_ocr_timeout == 120
+    assert settings.ocr_timeout == 120
     assert settings.gemma_ocr_max_tokens == 4096
 
 
