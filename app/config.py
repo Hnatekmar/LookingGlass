@@ -80,8 +80,8 @@ class Settings(BaseSettings):  # Define Settings class inheriting from BaseSetti
         "http://172.16.100.189:8010/v1", alias="GEMMA_OCR_URL"
     )
     gemma_ocr_model: str = Field("gemma-12b", alias="GEMMA_OCR_MODEL")
-    # Gemma OCR request timeout (seconds)
-    gemma_ocr_timeout: int = Field(120, alias="GEMMA_OCR_TIMEOUT")
+    # OCR request timeout (seconds)
+    ocr_timeout: int = Field(120, alias="OCR_TIMEOUT")
     # Gemma OCR max tokens in response
     gemma_ocr_max_tokens: int = Field(4096, alias="GEMMA_OCR_MAX_TOKENS")
 

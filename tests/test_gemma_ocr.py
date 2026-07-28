@@ -19,7 +19,7 @@ async def test_gemma_ocr_service_initialization():
         service = GemmaOCRService()
         assert service.api_url == settings.gemma_ocr_url.rstrip("/") + "/chat/completions"
         assert service.model == settings.gemma_ocr_model
-        assert service.timeout == settings.gemma_ocr_timeout
+        assert service.timeout == settings.ocr_timeout
         mock_client.assert_called_once()
 
 

@@ -14,7 +14,7 @@ services:
       - ENABLE_GEMMA_OCR=${ENABLE_GEMMA_OCR:-false}
       - GEMMA_OCR_URL=${GEMMA_OCR_URL:-http://172.16.100.189:8010/v1}
       - GEMMA_OCR_MODEL=${GEMMA_OCR_MODEL:-gemma-12b}
-      - GEMMA_OCR_TIMEOUT=${GEMMA_OCR_TIMEOUT:-120}
+      - OCR_TIMEOUT=${OCR_TIMEOUT:-120}
       - GEMMA_OCR_MAX_TOKENS=${GEMMA_OCR_MAX_TOKENS:-4096}
     networks:
       - lookingglass-network
