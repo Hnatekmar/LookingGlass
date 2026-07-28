@@ -23,9 +23,9 @@ Client (curl/browser/Tampermonkey)
   │ processing   │  Routes between OCR providers
   └──────┬───────┘
          │
-         ├─── ENABLE_GLM_OCR=true ────► GLMOCRService (glmocr SDK)
+         ├─── OCR_PROVIDER=gemma ───► GemmaProvider (OpenAI-compatible API)
          │
-         └─── ENABLE_GLM_OCR=false ───► VLM fallback (pydantic_ai Agent)
+         └─── OCR_PROVIDER=vlm ─────► VLMProvider (pydantic_ai Agent)
                                          └──► OpenAI-compatible API at IMAGE_MODEL_URL
                                                  │
                                                  ▼
@@ -70,17 +70,12 @@ Client (curl/browser/Tampermonkey)
 
 ### `app/image_processing.py`
 - Entry point for text detection in images
-- Routes to the configured OCR provider (GLM-OCR SDK or VLM fallback)
+- Routes to the configured OCR provider (gemma or VLM via provider registry)
 - Tile-based processing for large images:
   - `TILE_SIZE=1024` px
   - `TILE_OVERLAP=64` px overlap
 - Deduplication of overlapping labels via IOU threshold
 - Caching via `image_annotation_cache`
-
-### `app/glm_ocr_client.py`
-- Wraps the `glmocr` SDK for text detection
-- `GLMOCRService` class with `extract_text_with_bboxes()`
-- Imported lazily — GLM-OCR mode must be explicitly enabled
 
 ### `app/translation.py`
 - Batch translation via `pydantic_ai` Agent with structured output
@@ -125,9 +120,9 @@ complete reference. Key settings:
 | `IMAGE_MODEL` | Yes | — | Vision/OCR model name |
 | `TRANSLATION_MODEL` | Yes | — | Translation model name |
 | `IMAGE_MODEL_URL` | Yes | — | OpenAI-compatible API URL for image model |
-| `TRANSLATION_MODEL_URL` | Yes | — | OpenAI-compatible API URL for translation model |
-| `ENABLE_GLM_OCR` | No | `false` | Use GLM-OCR SDK instead of VLM fallback |
-| `PORT` | No | `8000` | Server port |
+|| `TRANSLATION_MODEL_URL` | Yes | — | OpenAI-compatible API URL for translation model |
+|| `OCR_PROVIDER` | No | `gemma` | Select OCR provider: gemma or vlm |
+|| `PORT` | No | `8000` | Server port |
 | `CORS_ORIGINS` | No | `*` | CORS allowed origins (comma-separated) |
 | `API_KEY` | No | — | Enable API key authentication |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
@@ -139,10 +134,9 @@ details on Docker, systemd, and Kubernetes (future) approaches.
 
 ## Adding a New Vision Model
 
-1. Implement the OCR interface (currently done via `_extract_labels_from_image` in
-   `image_processing.py`)
-2. Add config fields to `Settings` in `config.py`
-3. Update `.env.example` with new env vars
-4. Add import routing in `_extract_labels_from_image()`
+1. Implement the provider class in `app/providers/` implementing the `VisionProvider` protocol
+2. Register the provider in `app/providers/__init__.py` using `register(name, ProviderClass)`
+3. Add config fields to `Settings` in `config.py`
+4. Update `.env.example` with new env vars
 5. Write tests in `tests/`
 6. Update docs

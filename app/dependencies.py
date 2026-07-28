@@ -53,7 +53,7 @@ def get_http_client(settings_obj: Settings, for_translation: bool = False) -> ht
         if _http_client is not None and not _http_client.is_closed:
             return _http_client
         
-        timeout = settings_obj.glm_ocr_timeout
+        timeout = settings_obj.ocr_timeout  # Image/OCR HTTP client timeout
         _http_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout, connect=10.0),
             limits=httpx.Limits(

@@ -19,7 +19,7 @@ async def test_gemma_ocr_service_initialization():
         service = GemmaOCRService()
         assert service.api_url == settings.gemma_ocr_url.rstrip("/") + "/chat/completions"
         assert service.model == settings.gemma_ocr_model
-        assert service.timeout == settings.gemma_ocr_timeout
+        assert service.timeout == settings.ocr_timeout
         mock_client.assert_called_once()
 
 
@@ -273,7 +273,6 @@ async def test_gemma_ocr_image_processing_integration():
     with patch("app.image_processing.get_settings") as mock_get_settings:
         mock_settings = MagicMock()
         mock_settings.ocr_provider = "gemma"
-        mock_settings.enable_glm_ocr = False
         mock_get_settings.return_value = mock_settings
 
         mock_gemma_provider = AsyncMock()

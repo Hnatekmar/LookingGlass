@@ -14,7 +14,6 @@ def test_registry_list_providers():
     from app.providers.registry import list_providers
 
     names = list_providers()
-    assert "glm_ocr" in names
     assert "gemma" in names
     assert "vlm" in names
 
@@ -24,8 +23,8 @@ def test_registry_get_provider():
     from app.providers.registry import get_provider, _registry
 
     # Verify the provider class is registered without instantiating it
-    assert "glm_ocr" in _registry
-    assert issubclass(_registry["glm_ocr"], object)  # just verify it's a class
+    assert "gemma" in _registry
+    assert issubclass(_registry["gemma"], object)  # just verify it's a class
 
 
 def test_registry_get_unknown_provider():
@@ -63,20 +62,6 @@ def test_registry_register():
     # Restore original state
     _registry.clear()
     _registry.update(original)
-
-
-# ==============================================================================
-# GLM-OCR Provider tests
-# ==============================================================================
-
-
-def test_glm_ocr_provider_imports():
-    """GLMOCRProvider can be imported and instantiated."""
-    from app.providers.glm_ocr_provider import GLMOCRProvider
-
-    # NOTE: actual instantiation will fail if glmocr SDK is not installed,
-    # but the class itself should be importable.
-    assert GLMOCRProvider.__name__ == "GLMOCRProvider"
 
 
 # ==============================================================================
@@ -139,7 +124,7 @@ async def test_extract_labels_uses_provider():
     ):
         # Mock settings
         mock_settings = AsyncMock()
-        mock_settings.ocr_provider = "glm_ocr"
+        mock_settings.ocr_provider = "gemma"
         mock_get_settings.return_value = mock_settings
 
         # Mock provider
@@ -153,5 +138,5 @@ async def test_extract_labels_uses_provider():
 
         assert len(result.labels) == 1
         assert result.labels[0].text == "test"
-        mock_get_provider.assert_called_once_with("glm_ocr")
+        mock_get_provider.assert_called_once_with("gemma")
         mock_provider.extract_text.assert_called_once_with(b"fake-image-bytes")
