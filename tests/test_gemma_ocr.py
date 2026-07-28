@@ -273,7 +273,6 @@ async def test_gemma_ocr_image_processing_integration():
     with patch("app.image_processing.get_settings") as mock_get_settings:
         mock_settings = MagicMock()
         mock_settings.ocr_provider = "gemma"
-        mock_settings.enable_glm_ocr = False
         mock_get_settings.return_value = mock_settings
 
         mock_gemma_provider = AsyncMock()

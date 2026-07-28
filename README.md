@@ -1,11 +1,11 @@
 # LookingGlass
 
 OCR + image translation service using LLMs. Detects text regions in images via
-GLM-OCR or vision-language models and translates them using language models.
+vision-language models and translates them using language models.
 
 ## Features
 
-- **Text Detection**: GLM-OCR SDK or vision-language model fallback
+- **Text Detection**: Vision-language model (Gemma or generic VLM)
 - **Batch Translation**: Efficient batch translation via LLM API with caching
 - **Streaming SSE**: Progressive label delivery as tiles are processed
 - **Tampermonkey Extension**: Browser userscript for inline image annotation
@@ -60,7 +60,7 @@ complete reference. Key settings:
 | `TRANSLATION_MODEL` | Yes | Translation model name |
 | `IMAGE_MODEL_URL` | Yes | OpenAI-compatible API URL for the image model |
 | `TRANSLATION_MODEL_URL` | Yes | OpenAI-compatible API URL for the translation model |
-| `ENABLE_GLM_OCR` | No | Set `true` to use GLM-OCR SDK pipeline (default: `false`) |
+| `OCR_PROVIDER` | No | Select OCR provider: gemma or vlm (default: `gemma`) |
 | `ENABLE_GEMMA_OCR` | No | Set `true` to use Gemma 12b as OCR backend (default: `false`) |
 | `CORS_ORIGINS` | No | Comma-separated allowed origins (default: `*`) |
 | `API_KEY` | No | Enable API key authentication (default: disabled) |
@@ -75,7 +75,6 @@ lookingglass/
 │   ├── config.py            # Pydantic-settings (env-based)
 │   ├── container.py         # Dependency injection
 │   ├── dependencies.py      # HTTP pools, agent factory
-│   ├── glm_ocr_client.py    # GLM-OCR SDK integration
 │   ├── image_processing.py  # OCR pipeline, tiling, dedup
 │   ├── schema.py            # Pydantic models
 │   ├── translation.py       # Batch + individual translation
@@ -94,7 +93,7 @@ lookingglass/
 ## Architecture
 
 ```
-Client → FastAPI (v1/) → image_processing.py → OCR Provider (GLM-OCR / VLM)
+Client → FastAPI (v1/) → image_processing.py → OCR Provider (Gemma / VLM)
                                                    │
                                               translation.py → LLM API
                                                    │

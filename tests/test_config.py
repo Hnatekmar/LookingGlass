@@ -31,7 +31,7 @@ def test_settings_ocr_provider_default():
         IMAGE_MODEL_URL="http://localhost:8000/v1",
         TRANSLATION_MODEL_URL="http://localhost:8001/v1",
     )
-    assert settings.ocr_provider == "glm_ocr"
+    assert settings.ocr_provider == "gemma"
 
 
 def test_settings_ocr_provider_explicit():
@@ -44,29 +44,6 @@ def test_settings_ocr_provider_explicit():
         OCR_PROVIDER="gemma",
     )
     assert settings.ocr_provider == "gemma"
-
-
-def test_settings_deprecated_glm_ocr_emits_warning():
-    """ENABLE_GLM_OCR emits deprecation warning and maps to OCR_PROVIDER."""
-    # Unset OCR_PROVIDER so the deprecation fallback is exercised
-    old_provider = os.environ.pop("OCR_PROVIDER", None)
-    try:
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            settings = Settings(
-                IMAGE_MODEL="test-model",
-                TRANSLATION_MODEL="test-translator",
-                IMAGE_MODEL_URL="http://localhost:8000/v1",
-                TRANSLATION_MODEL_URL="http://localhost:8001/v1",
-                ENABLE_GLM_OCR=True,
-            )
-            assert settings.ocr_provider == "glm_ocr"
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "ENABLE_GLM_OCR" in str(w[0].message)
-    finally:
-        if old_provider is not None:
-            os.environ["OCR_PROVIDER"] = old_provider
 
 
 def test_settings_deprecated_gemma_ocr_emits_warning():
@@ -101,7 +78,7 @@ def test_settings_deprecated_overridden_by_explicit():
             TRANSLATION_MODEL="test-translator",
             IMAGE_MODEL_URL="http://localhost:8000/v1",
             TRANSLATION_MODEL_URL="http://localhost:8001/v1",
-            ENABLE_GLM_OCR=True,
+            ENABLE_GEMMA_OCR=True,
             OCR_PROVIDER="vlm",
         )
         # Explicit OCR_PROVIDER wins, no deprecation warning
@@ -109,28 +86,16 @@ def test_settings_deprecated_overridden_by_explicit():
         assert len(w) == 0
 
 
-def test_settings_glm_ocr_defaults():
-    """Test GLM-OCR default values."""
+def test_settings_ocr_timeout_defaults():
+    """Test OCR timeout default values."""
     settings = Settings(
         IMAGE_MODEL="test-model",
         TRANSLATION_MODEL="test-translator",
         IMAGE_MODEL_URL="http://localhost:8000/v1",
         TRANSLATION_MODEL_URL="http://localhost:8001/v1",
     )
-    assert settings.glm_ocr_timeout == 60
+    assert settings.gemma_ocr_timeout == 120
     assert settings.translation_timeout == 600
-
-
-def test_settings_glm_ocr_host_extraction():
-    """Test host extraction from image model URL."""
-    settings = Settings(
-        IMAGE_MODEL="test-model",
-        TRANSLATION_MODEL="test-translator",
-        IMAGE_MODEL_URL="https://ocr.example.com:8443/v1",
-        TRANSLATION_MODEL_URL="http://localhost:8001/v1",
-    )
-    assert settings.glm_ocr_host == "ocr.example.com"
-    assert settings.glm_ocr_port == 8443
 
 
 def test_settings_immutable():
@@ -173,7 +138,7 @@ def test_settings_new_defaults():
     assert settings.cors_origins == "*"
     assert settings.api_key is None
     assert settings.translation_enable_thinking is False
-    assert settings.ocr_provider == "glm_ocr"
+    assert settings.ocr_provider == "gemma"
 
 
 def test_settings_gemma_defaults():
@@ -204,15 +169,3 @@ def test_settings_per_provider_overrides():
     )
     assert settings.ocr_provider_gemma_url == "http://override:9000/v1"
     assert settings.ocr_provider_gemma_model == "override-model"
-
-
-def test_settings_glm_ocr_host_property():
-    """Test glm_ocr_host returns correct hostname."""
-    settings = Settings(
-        IMAGE_MODEL="test-model",
-        TRANSLATION_MODEL="test-translator",
-        IMAGE_MODEL_URL="http://api.example.com:8080/v1",
-        TRANSLATION_MODEL_URL="http://localhost:8001/v1",
-    )
-    assert settings.glm_ocr_host == "api.example.com"
-    assert settings.glm_ocr_port == 8080

@@ -71,12 +71,11 @@ for async tests and `pytest-timeout` to prevent hung tests.
 
 ## Adding a New OCR Provider
 
-Currently, the OCR pipeline in `image_processing.py` routes between GLM-OCR SDK
-and a generic VLM fallback via an `ENABLE_GLM_OCR` boolean. To add a new provider:
+Currently, the OCR pipeline in `image_processing.py` uses a provider registry (app/providers/) to route between available OCR providers (gemma, vlm). To add a new provider:
 
 1. Add config fields to `app/config.py::Settings`
-2. Add the provider client in a new file (e.g., `app/providers/`)
-3. Add routing logic in `_extract_labels_from_image()` in `image_processing.py`
+2. Add the provider class in `app/providers/` implementing the `VisionProvider` protocol
+3. Register the provider in `app/providers/__init__.py` using `register(name, ProviderClass)`
 4. Add env vars to `.env.example`
 5. Write tests
 6. Update docs

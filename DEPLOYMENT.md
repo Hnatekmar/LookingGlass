@@ -23,8 +23,7 @@ docker run -d \
 
 ### Docker Compose
 
-The `docker-compose.yml` includes both the LookingGlass app and a vLLM server
-for GLM-OCR:
+The `docker-compose.yml` includes the LookingGlass app:
 
 ```bash
 docker compose up --build

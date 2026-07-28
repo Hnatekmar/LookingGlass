@@ -11,16 +11,13 @@ WORKDIR /app
 # Copy only the pyproject file first to leverage Docker cache for dependencies
 COPY pyproject.toml ./
 
-# Install system dependencies for OpenCV and glmocr layout detector,
+# Install system dependencies for image processing,
 # then install uv package manager, and clean up in one RUN layer
 # to minimize image size.
 RUN apt-get update && apt-get install -y --no-install-recommends \
   curl \
   libgl1 \
   libglib2.0-0 \
-  libsm6 \
-  libxext6 \
-  libxrender-dev \
   && curl -LsSf https://astral.sh/uv/install.sh | sh \
   && rm -rf /var/lib/apt/lists/*
 
